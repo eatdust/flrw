@@ -16,28 +16,34 @@ module rdof
   
   real(dp), dimension(:), allocatable :: xknots, zknots
   real(dp), dimension(:), allocatable :: gxbcoef, qxbcoef
-  real(dp), dimension(:), allocatable :: gzbcoef, qzbcoef, czbcoef, xbcoef
+  real(dp), dimension(:), allocatable :: gzbcoef, qzbcoef, czbcoef
+  real(dp), dimension(:), allocatable :: xbcoef, zbcoef
 
 !max number of records in precomputed data file
   integer, parameter :: nrecmax = 300
   integer, parameter :: ncols = 3
 
   real(dp), parameter :: To = 2.725 !K
+
   real(dp), parameter :: eV = 11604.505 !K
   real(dp), parameter :: GeV = eV*1d9 !K
 
+  real(dp), parameter :: MpInGeV = 2.435323186423786d18 !GeV
+  real(dp), parameter :: MpInK = MpInGeV*GeV
+
+  
   logical, parameter :: display = .false.
 !set it to true to generate binary preprocessed data in rdof.pp
 !from data file
   logical, parameter :: createPP = .false.  
   
-  public To, GeV, dp
+  public To, GeV, MpInK, dp
   
   public readump_data, preprocessed_data
   public set_splines, check_splines, free_splines
   public energy_rdof_x, entropy_rdof_x
-  public x_rdof, energy_rdof_z, entropy_rdof_z, correction_rdof_z
-  
+  public energy_rdof_z, entropy_rdof_z, correction_rdof_z
+  public x_rdof, z_rdof
 contains
 
 
@@ -177,7 +183,8 @@ contains
        if ((.not.allocated(gxbcoef)).or.(.not.allocated(qxbcoef)) &
             .or.(.not.allocated(xbcoef)).or.(.not.allocated(zknots)) &
             .or.(.not.allocated(gzbcoef)).or.(.not.allocated(qzbcoef)) &
-            .or.(.not.allocated(czbcoef))) stop 'check_splines: bcoefs not found!'
+            .or.(.not.allocated(czbcoef)).or.(.not.allocated(zbcoef))) &
+            stop 'check_splines: bcoefs not found!'
     endif
 
   end function  check_splines
@@ -189,7 +196,7 @@ contains
 
     if (check_splines()) then
        deallocate(xknots,gxbcoef,qxbcoef)
-       deallocate(zknots,xbcoef,gzbcoef,qzbcoef,czbcoef)
+       deallocate(zknots,xbcoef,zbcoef,gzbcoef,qzbcoef,czbcoef)
     endif
 
   end subroutine free_splines
@@ -214,13 +221,14 @@ contains
     endif
 
     allocate(xknots(ndata+order),zknots(ndata+order))
-    allocate(gxbcoef(ndata),qxbcoef(ndata),xbcoef(ndata))
+    allocate(gxbcoef(ndata),qxbcoef(ndata),xbcoef(ndata),zbcoef(ndata))
     allocate(gzbcoef(ndata),qzbcoef(ndata),czbcoef(ndata))
 
     call dbsnak(ndata,xdata(ndata:1:-1),order,xknots)
     call dbsint(ndata,xdata(ndata:1:-1),gdata(ndata:1:-1),order,xknots,gxbcoef)
     call dbsint(ndata,xdata(ndata:1:-1),qdata(ndata:1:-1),order,xknots,qxbcoef)
-
+    call dbsint(ndata,xdata(ndata:1:-1),zdata(ndata:1:-1),order,xknots,zbcoef)
+    
     call dbsnak(ndata,zdata(ndata:1:-1),order,zknots)
     call dbsint(ndata,zdata(ndata:1:-1),xdata(ndata:1:-1),order,zknots,xbcoef)
     call dbsint(ndata,zdata(ndata:1:-1),gdata(ndata:1:-1),order,zknots,gzbcoef)
@@ -239,8 +247,9 @@ contains
     implicit none
     real(dp), intent(in) :: x,qoverqo
     real(dp) :: redshift_from_entropy
+    real(dp), parameter :: onethird = 1._dp/3._dp
 
-    redshift_from_entropy = (qoverqo)**(1._dp/3._dp) * x - 1._dp
+    redshift_from_entropy = (qoverqo)**(onethird) * x - 1._dp
         
   end function redshift_from_entropy
 
@@ -316,6 +325,23 @@ contains
   end function x_rdof
 
 
+
+  recursive function z_rdof(x) result(z)
+    implicit none
+    real(dp), intent(in) :: x
+    real(dp) :: z
+
+    if (x.lt.xmin) then
+       z = z_rdof(xmin) * (1+x)/(1+xmin)
+    elseif (x.gt.xmax) then
+       z = z_rdof(xmax) * (1+x)/(1+xmax)
+    else
+       z = dbsval(x, order, xknots, ndata, zbcoef)
+    endif
+
+  end function z_rdof
+
+  
   
 
   recursive function energy_rdof_z(z) result(g)

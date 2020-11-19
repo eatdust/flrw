@@ -104,7 +104,7 @@ module flrw
   public omegarad_today, omegamat_today, omegalambda_today
   
 #ifdef THERMAL
-  public correction_rdof
+  public correction_rdof, entropy_correction_rdof
   public nothermal_hubble_normalized_scalefactor_square
 #endif
 
@@ -548,6 +548,27 @@ contains
     
   end function hubble_normalized_scalefactor_square
 
+!to potentially implement a step like minimal thing
+  function correction_rdof(z)
+    implicit none
+    real(cp), intent(in) :: z
+    real(cp) :: correction_rdof
+    
+    correction_rdof = 1._cp
+    
+  end function correction_rdof
+
+  
+  function entropy_correction_rdof(z)
+    real(cp), intent(in) :: z
+    real(cp) :: entropy_correction_rdof
+
+
+    entropy_correction_rdof = 1._cp
+    
+  end function entropy_correction_rdof
+
+  
 #else  
 
 
@@ -596,7 +617,7 @@ contains
     
   end function correction_rdof
   
-
+  
   
 !requires two spline evaluations
   function old_correction_rdof(z)
@@ -621,10 +642,24 @@ contains
   end function old_correction_rdof
 
 
+  function entropy_correction_rdof(z)
+    use rdof, only : dp, entropy_rdof_z
+    real(cp) :: entropy_correction_rdof
+    real(cp), intent(in) :: z
+    real(dp) :: redshift
+
+    redshift = real(z,dp)
+
+    entropy_correction_rdof = (real(entropy_rdof_z(redshift),cp)/flParams%qo)
     
+  end function entropy_correction_rdof
+
+  
 #endif
   
-  
+
+   
+
   
   
 

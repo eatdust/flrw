@@ -83,8 +83,8 @@ program thermal
 
 !     x = redshift_radtime_normalized(tradHo,Q=1._dp)
 
-     x = redshift_toa_radtime_normalized(tradHo/a,Q=1._dp)
-     print *,'scaling z= x-z= ',z,(x-z)/(x+z)*2
+!     x = redshift_toa_radtime_normalized(tradHo/a,Q=1._dp)
+!     print *,'scaling z= x-z= ',z,(x-z)/(x+z)*2
      
      
      call livewrite('times.dat',z,tHo,tscalHo,tmatHo,tradHo)
