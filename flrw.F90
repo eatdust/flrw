@@ -1,5 +1,7 @@
 module flrw
-!basic FLRW background integration with possibility to include g*(T)
+!basic FLRW background integration with possibility to include g*(T),
+!also contains exact radiation and matter solution used in the gw
+!calculations for the strings
   implicit none
 
   integer, parameter :: cp = kind(1._8)
