@@ -2,12 +2,14 @@
 !originally in GeV into the dimensionless value x = T/Tcmb
 
 module rdof
-  use prec, only : dp
+  use precision, only : fdp
   use bspline, only : dbsnak, dbsint, dbsval, dbsder
 
   implicit none
 
   private
+
+  integer, parameter :: dp = fdp
   
   integer, parameter :: order = 3
   integer, save :: ndata = 0

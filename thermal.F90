@@ -1,11 +1,10 @@
 program thermal
-  use prec, only : dp
   use iotools
   use rdof
   use flrw
 
   implicit none
-
+  
   real(dp) :: x
   real(dp) :: lnxmin, lnxmax
   real(dp), dimension(:), allocatable :: xdata, qdata, gdata, adata, cdata
@@ -16,6 +15,8 @@ program thermal
   real(dp) :: qstar, gstar, zcross
 
   real(dp) :: tHo, tscalHo, tradHo, tmatHo
+
+  real(dp) :: etaHoEx, etaHoApp
   
   integer :: npoints
   integer :: i
@@ -29,9 +30,10 @@ program thermal
 !  call set_splines()
 
   
-#ifdef THERMAL
+
   call set_fiducial_flparams()
-#else
+
+#ifndef THERMAL
   call set_splines()
 #endif
   
@@ -60,9 +62,9 @@ program thermal
   lnzp1max = 40._dp
 
   zcross = redshift_crossing()
-  print *,'zcross',zcross,redshift_equality()
+  print *,'zcross= zeq=',zcross,redshift_equality()
 
-  read(*,*)
+!  read(*,*)
   !  print *,'test',cosmic_mattime_normalized(zcross),cosmic_radtime_normalized(zcross) &
 !, cosmic_scalingtime_normalized(zcross)
   
@@ -85,7 +87,13 @@ program thermal
 
 !     x = redshift_toa_radtime_normalized(tradHo/a,Q=1._dp)
 !     print *,'scaling z= x-z= ',z,(x-z)/(x+z)*2
-     
+
+     etaHoEx = conformal_time_normalized(z)
+     etaHoApp = conformal_scalingtime_normalized(z)
+     print *,'etaHoApp= etaHoEx=',etaHoApp,etaHoEx
+     print *,'z etaHo2z= ',z,redshift_conformal_scalingtime_normalized(etaHoApp,Q=1._dp)
+
+     call livewrite('eta.dat',z,etaHoEx,etaHoApp)
      
      call livewrite('times.dat',z,tHo,tscalHo,tmatHo,tradHo)
      

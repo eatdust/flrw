@@ -1,9 +1,10 @@
 module cosmospline
-  use prec, only : dp
+  use precision, only : fdp
   use bspline, only : dbsnak, dbsint, dbsval
   use flrw
   implicit none
 
+  integer, parameter :: dp = fdp
 
   private
 

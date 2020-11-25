@@ -45,6 +45,7 @@ module flrw
   interface redshift_radtime_normalized
      module procedure cp_redshift_radtime_normalized, ep_redshift_radtime_normalized
   end interface redshift_radtime_normalized
+
   
   interface redshift_toa_scalingtime_normalized
      module procedure cp_redshift_toa_scalingtime_normalized, ep_redshift_toa_scalingtime_normalized
@@ -89,18 +90,28 @@ module flrw
   
   public display_flparams
   public set_cosmo_params, set_fiducial_flparams
-  public cosmic_time, cosmic_scalingtime
-  public conformal_time, redshift, redshift_scalingtime, redshift_equality
-  public redshift_crossing, comoving_distance
-
-  public cosmic_scalingtime_normalized, redshift_scalingtime_normalized
+  public cosmic_time, cosmic_scalingtime, comoving_distance
+  public conformal_time, cosmic_time_normalized
+  public conformal_time_normalized, conformal_scalingtime_normalized
+  
+  public cosmic_scalingtime_normalized
   public cosmic_mattime_normalized, cosmic_radtime_normalized
-  public redshift_toa_scalingtime_normalized, comoving_distance_normalized
-  public redshift_radtime_normalized, redshift_toa_radtime_normalized
-  public conformal_time_normalized, cosmic_time_normalized, redshift_normalized
-  public redshift_chioa_normalized, cosmic_scalingtime_today_normalized
-  public cosmic_time_today_normalized, comoving_distance_today_normalized
+  public cosmic_scalingtime_today_normalized
+  public cosmic_time_today_normalized
+
+  public comoving_distance_normalized, comoving_distance_today_normalized
+
+  public redshift, redshift_scalingtime
+  public redshift_equality, redshift_crossing
+  
+  public redshift_normalized
+  public redshift_scalingtime_normalized
+  public redshift_radtime_normalized
+  public redshift_toa_scalingtime_normalized
+  public redshift_toa_radtime_normalized
+  public redshift_chioa_normalized
   public redshift_tchipower_scalingtime_normalized
+  public redshift_conformal_scalingtime_normalized
   
   public hubble_today_hz, hubble_today, hubble_normalized, hubble_today_Lpl
   public omegarad_today, omegamat_today, omegalambda_today
@@ -115,10 +126,10 @@ contains
 
   subroutine set_fiducial_flparams()
     implicit none
-     
-     real(cp), parameter :: h = 0.679
-     real(cp), parameter :: OmegaBh2 = 0.02227
-     real(cp), parameter :: OmegaCh2 = 0.1184
+!Planck18 TT+TE+EE+lowE+lensing with r     
+     real(cp), parameter :: h = 0.6740
+     real(cp), parameter :: OmegaBh2 = 0.02237
+     real(cp), parameter :: OmegaCh2 = 0.1199
      real(cp), parameter :: OmegaPhoton = 5.38e-5
 !all neutrino relativist -> 1.68
      real(cp), parameter :: OmegaRh2 = 1.68 * OmegaPhoton *h*h
@@ -454,8 +465,6 @@ contains
     real(cp) :: scaleFactor,tHoDeepRad
     real(cp), dimension(neq) :: a,lna
 
-
-    
     
     tHodeepRad = cosmic_radtime_normalized(zDeepRad)
 
@@ -508,7 +517,6 @@ contains
 
   
 
-  
   
   function redshift(cosmicTime)
     implicit none
@@ -660,9 +668,7 @@ contains
 #endif
   
 
-   
-
-  
+     
   
 
   function hubble_normalized(z)
@@ -681,6 +687,12 @@ contains
   
   
 
+
+!!!!!some approximated functions for fast evaluations, scaling time
+!!!!!refers to pure matter and pure radiation
+
+
+  
   
   function cp_cosmic_scalingtime(redshift)
     implicit none
@@ -1056,6 +1068,79 @@ contains
     
   end function ep_redshift_radtime_normalized
   
+  
+
+
+
+  
+
+  recursive function redshift_conformal_scalingtime_normalized(etaHo,Q,y) result(z)
+    implicit none
+    real(cp) :: z
+    real(cp), intent(in) :: etaHo
+    real(cp), intent(in), optional :: Q,y
+
+    real(cp), parameter :: tol = tolfl
+
+    real(cp) :: sqrtomR, omRoM
+    real(cp) :: scaleFactor, dz
+    
+    if (present(Q)) then
+       sqrtomR = sqrt(flParams%OmegaR*Q)
+    else
+       sqrtomR = sqrt(flParams%OmegaR)
+    endif
+
+    
+    scaleFactor = 0.25_cp*flParams%OmegaM * etaHo*etaHo + sqrtomR * etaHo
+    
+    z = 1._cp/scaleFactor - 1._cp
+    
+#ifdef THERMAL
+    if (.not.present(Q)) return
+    if (present(y)) then
+       dz = 2*(y - z)/(y + z)
+       if (abs(dz).lt.tol) return
+    endif
+    z = redshift_conformal_scalingtime_normalized(etaHo,correction_rdof(z),z)
+#endif    
+
+    
+  end function redshift_conformal_scalingtime_normalized
+
+
+
+
+
+
+!returns etaHo from redshift, approximated if thermal is on
+  function conformal_scalingtime_normalized(z)
+    implicit none
+    real(cp) :: conformal_scalingtime_normalized
+    real(cp), intent(in) :: z
+
+    real(cp) ::  scaleFactor
+    real(cp) :: Q
+
+    Q = 1._cp
+    scaleFactor = 1._cp / (1._cp + z)
+
+#ifdef THERMAL
+    Q = correction_rdof(z)
+#endif
+    
+    conformal_scalingtime_normalized = 2._cp * scaleFactor &
+         / ( sqrt(flParams%OmegaR*Q + flParams%OmegaM*scaleFactor) &
+         + sqrt(flParams%OmegaR*Q) ) 
+        
+  end function conformal_scalingtime_normalized
+
+
+
+
+
+
+
   
   
   
