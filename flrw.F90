@@ -92,7 +92,9 @@ module flrw
   public set_cosmo_params, set_fiducial_flparams
   public cosmic_time, cosmic_scalingtime, comoving_distance
   public conformal_time, cosmic_time_normalized
-  public conformal_time_normalized, conformal_scalingtime_normalized
+  public conformal_time_normalized, conformal_radmattime_normalized
+  public conformal_radtime_equality_normalized
+
   
   public cosmic_scalingtime_normalized
   public cosmic_mattime_normalized, cosmic_radtime_normalized
@@ -111,7 +113,7 @@ module flrw
   public redshift_toa_radtime_normalized
   public redshift_chioa_normalized
   public redshift_tchipower_scalingtime_normalized
-  public redshift_conformal_scalingtime_normalized
+  public redshift_conformal_radmattime_normalized
   
   public hubble_today_hz, hubble_today, hubble_normalized, hubble_today_Lpl
   public omegarad_today, omegamat_today, omegalambda_today
@@ -288,7 +290,9 @@ contains
   end function redshift_equality
 
 
-  
+!makes t as a function of z continuous, but H discontinuous. Junctions
+!conditions require H continuous, therefore unsuitable for
+!perturbations
   function redshift_crossing()
     implicit none
     real(cp) :: redshift_crossing
@@ -297,6 +301,18 @@ contains
 
   end function redshift_crossing
 
+
+!returns the radiation-era calH0 * conformal time at which rhomat=rhorad or
+!z=zeq. This is the shift for matter era solutions needed by
+!instantaneous transitions radiation matter.
+  function conformal_radtime_equality_normalized()
+    implicit none
+    real(cp) :: conformal_radtime_equality_normalized
+
+    conformal_radtime_equality_normalized = sqrt(flParams%OmegaR)/flParams%OmegaM
+    
+
+  end function conformal_radtime_equality_normalized
 
   
 
@@ -1074,7 +1090,7 @@ contains
 
   
 
-  recursive function redshift_conformal_scalingtime_normalized(etaHo,Q,y) result(z)
+  recursive function redshift_conformal_radmattime_normalized(etaHo,Q,y) result(z)
     implicit none
     real(cp) :: z
     real(cp), intent(in) :: etaHo
@@ -1102,11 +1118,11 @@ contains
        dz = 2*(y - z)/(y + z)
        if (abs(dz).lt.tol) return
     endif
-    z = redshift_conformal_scalingtime_normalized(etaHo,correction_rdof(z),z)
+    z = redshift_conformal_radmattime_normalized(etaHo,correction_rdof(z),z)
 #endif    
 
     
-  end function redshift_conformal_scalingtime_normalized
+  end function redshift_conformal_radmattime_normalized
 
 
 
@@ -1114,9 +1130,9 @@ contains
 
 
 !returns etaHo from redshift, approximated if thermal is on
-  function conformal_scalingtime_normalized(z)
+  function conformal_radmattime_normalized(z)
     implicit none
-    real(cp) :: conformal_scalingtime_normalized
+    real(cp) :: conformal_radmattime_normalized
     real(cp), intent(in) :: z
 
     real(cp) ::  scaleFactor
@@ -1129,11 +1145,11 @@ contains
     Q = correction_rdof(z)
 #endif
     
-    conformal_scalingtime_normalized = 2._cp * scaleFactor &
+    conformal_radmattime_normalized = 2._cp * scaleFactor &
          / ( sqrt(flParams%OmegaR*Q + flParams%OmegaM*scaleFactor) &
          + sqrt(flParams%OmegaR*Q) ) 
         
-  end function conformal_scalingtime_normalized
+  end function conformal_radmattime_normalized
 
 
 
