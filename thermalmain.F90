@@ -1,7 +1,9 @@
-program thermal
+program thermalmain
   use iotools
   use rdof
+  use flvars
   use flrw
+  use flapprox
 
   implicit none
   
@@ -61,12 +63,10 @@ program thermal
   lnzp1min = 0.1_dp
   lnzp1max = 40._dp
 
-  zcross = redshift_crossing()
-  print *,'zcross= zeq=',zcross,redshift_equality()
+  print *,'zeq=',redshift_equality()
 
 !  read(*,*)
-  !  print *,'test',cosmic_mattime_normalized(zcross),cosmic_radtime_normalized(zcross) &
-!, cosmic_scalingtime_normalized(zcross)
+    print *,'test',cosmic_mattime_normalized(zcross),cosmic_radtime_normalized(zcross)
   
   do i = 1, npoints
      zp1 = exp(lnzp1min + real(i-1,dp)*(lnzp1Max - lnzp1Min) &
@@ -77,25 +77,22 @@ program thermal
      x = x_rdof(z)
 
      tHo = cosmic_time_normalized(z)
-     tscalHo = cosmic_scalingtime_normalized(z)
      tmatHo = cosmic_mattime_normalized(z)
      tradHo = cosmic_radtime_normalized(z)
 
      a = 1._dp/(1._dp + z)
 
-!     x = redshift_radtime_normalized(tradHo,Q=1._dp)
+     x = redshift_radtime_normalized(tradHo,Q=1._dp)
 
 !     x = redshift_toa_radtime_normalized(tradHo/a,Q=1._dp)
 !     print *,'scaling z= x-z= ',z,(x-z)/(x+z)*2
 
      etaHoEx = conformal_time_normalized(z)
-     etaHoApp = conformal_scalingtime_normalized(z)
-     print *,'etaHoApp= etaHoEx=',etaHoApp,etaHoEx
-     print *,'z etaHo2z= ',z,redshift_conformal_scalingtime_normalized(etaHoApp,Q=1._dp)
 
-     call livewrite('eta.dat',z,etaHoEx,etaHoApp)
+
+     call livewrite('eta.dat',z,etaHoEx)
      
-     call livewrite('times.dat',z,tHo,tscalHo,tmatHo,tradHo)
+     call livewrite('times.dat',z,tHo,tmatHo,tradHo)
      
      call livewrite('gandqstar_z.dat',x*To/GeV,gstar,qstar)
 
@@ -109,4 +106,4 @@ program thermal
 
      
 
-end program thermal
+end program thermalmain

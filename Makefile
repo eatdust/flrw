@@ -9,10 +9,10 @@ FFLAGS= -O -fopenmp -ffree-line-length-none -D$(ext) -DTHERMAL
 #-DTHERMAL
 endif
 
-OBJTH=precision.o bspline.o rdof.o iotools.o functools.o flrw.o
+OBJTH=precision.o bspline.o rdof.o iotools.o functools.o flvars.o flapprox.o flrw.o
 
-thermal.$(ext) : $(OBJTH) thermal.o
-	$(FC) $(FFLAGS) $(OBJTH) thermal.o -o $@ $(LDFLAGS)
+thermalmain.$(ext) : $(OBJTH) thermalmain.o
+	$(FC) $(FFLAGS) $(OBJTH) thermalmain.o -o $@ $(LDFLAGS)
 
 %.o: %.f90
 	$(FC) $(FFLAGS) -c $*.f90

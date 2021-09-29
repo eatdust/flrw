@@ -1,120 +1,32 @@
 module flrw
-!basic FLRW background integration with possibility to include g*(T),
-!also contains exact radiation and matter solution used in the gw
-!calculations for the strings
+!basic FLRW background integration with possibility to include g*(T)
+  use flvars, only : cp, cep, flbgparam
+  use flvars, only : c, Mpc,My,LPl
+  use flvars, only : tolfl, big
+  use flvars, only : flParams, correction_rdof, entropy_correction_rdof
+  
+    
   implicit none
 
-  integer, parameter :: cp = kind(1._8)
-  integer, parameter :: cep = kind(1._16)
-  
   private
-
-
-  interface cosmic_scalingtime
-     module procedure cp_cosmic_scalingtime, ep_cosmic_scalingtime
-  end interface
-
-  interface cosmic_scalingtime_normalized
-     module procedure cp_cosmic_scalingtime_normalized, ep_cosmic_scalingtime_normalized
-  end interface cosmic_scalingtime_normalized
+       
+  public cp, cep, LPl, Mpc, flbgparam
   
-  interface cosmic_mattime
-     module procedure cp_cosmic_mattime, ep_cosmic_mattime
-  end interface cosmic_mattime
-
-  interface cosmic_mattime_normalized
-     module procedure cp_cosmic_mattime_normalized, ep_cosmic_mattime_normalized
-  end interface cosmic_mattime_normalized
-
-  interface cosmic_radtime
-     module procedure cp_cosmic_radtime, ep_cosmic_radtime
-  end interface cosmic_radtime
-
-  interface cosmic_radtime_normalized
-     module procedure cp_cosmic_radtime_normalized, ep_cosmic_radtime_normalized
-  end interface cosmic_radtime_normalized
-
-  interface redshift_scalingtime
-     module procedure cp_redshift_scalingtime, ep_redshift_scalingtime
-  end interface redshift_scalingtime
-
-  interface redshift_scalingtime_normalized
-     module procedure cp_redshift_scalingtime_normalized, ep_redshift_scalingtime_normalized
-  end interface redshift_scalingtime_normalized
-
-  interface redshift_radtime_normalized
-     module procedure cp_redshift_radtime_normalized, ep_redshift_radtime_normalized
-  end interface redshift_radtime_normalized
-
-  
-  interface redshift_toa_scalingtime_normalized
-     module procedure cp_redshift_toa_scalingtime_normalized, ep_redshift_toa_scalingtime_normalized
-  end interface redshift_toa_scalingtime_normalized
-  
-  interface redshift_toa_radtime_normalized
-     module procedure cp_redshift_toa_radtime_normalized
-  end interface redshift_toa_radtime_normalized
-
-  
-  type flbgparam
-     real(cp) :: h, hubbleToday !Mpc
-     real(cp) :: OmegaM, OmegaR, OmegaL
- !for convenience
-     real(cp) :: OmegaK
-     real(cp) :: zeq
-     real(cp) :: Hoto, Hochi
-!for thermal history
-     real(cp) :: go, qo
-     
-  end type flbgparam
-
-  real(cp), parameter :: c = 299792.458 !km/s
-  real(cp), parameter :: Mpc = 3.0857d19 !km 
-  real(cp), parameter :: My = 365.25*24*3600*1d6 !s
-  real(cp), parameter :: LPl= 8.1026d-38 !km
-  
-  type(flbgparam), save :: flParams
- 
-  real(cp), save :: statbuffer, statpower
-!$omp threadprivate(statbuffer,statpower)  
-
-  real(cp), dimension(2), save :: partbuffer
-!$omp threadprivate(partbuffer)  
-  
-  real(cp), parameter :: tolfl = 100*epsilon(1._cp)
-  real(cp), parameter :: big = epsilon(1._cp)*huge(1._cp)
-
-
-
-  public cp, cep, LPl, Mpc
-  
-  public display_flparams
+  public display_flparams, get_flrw_params
   public set_cosmo_params, set_fiducial_flparams
-  public cosmic_time, cosmic_scalingtime, comoving_distance
-  public conformal_time, cosmic_time_normalized
-  public conformal_time_normalized, conformal_radmattime_normalized
-  public conformal_radtime_equality_normalized
 
-  
-  public cosmic_scalingtime_normalized
-  public cosmic_mattime_normalized, cosmic_radtime_normalized
-  public cosmic_scalingtime_today_normalized
-  public cosmic_time_today_normalized
+  public cosmic_time, comoving_distance
+
+  public conformal_time, cosmic_time_normalized
+  public conformal_time_normalized
 
   public comoving_distance_normalized, comoving_distance_today_normalized
 
-  public redshift, redshift_scalingtime
-  public redshift_equality, redshift_crossing
-  
+  public redshift
+  public redshift_equality  
   public redshift_normalized
-  public redshift_scalingtime_normalized
-  public redshift_radtime_normalized
-  public redshift_toa_scalingtime_normalized
-  public redshift_toa_radtime_normalized
   public redshift_chioa_normalized
-  public redshift_tchipower_scalingtime_normalized
-  public redshift_conformal_radmattime_normalized
-  
+     
   public hubble_today_hz, hubble_today, hubble_normalized, hubble_today_Lpl
   public omegarad_today, omegamat_today, omegalambda_today
   
@@ -123,9 +35,13 @@ module flrw
   public nothermal_hubble_normalized_scalefactor_square
 #endif
 
-  
+  real(cp), save :: statbuffer
+!$omp threadprivate(statbuffer)
+
+
 contains
 
+    
   subroutine set_fiducial_flparams()
     implicit none
 !Planck18 TT+TE+EE+lowE+lensing with r     
@@ -171,6 +87,15 @@ contains
     flParams%Hochi = comoving_distance_normalized(big)
     
   end subroutine set_cosmo_params
+
+
+  function get_flrw_params()
+    implicit none
+    type(flbgparam) :: get_flrw_params
+
+    get_flrw_params = flParams
+
+  end function get_flrw_params
 
 
   
@@ -242,15 +167,7 @@ contains
     
 
 
-  function cosmic_scalingtime_today_normalized()
-    implicit none
-    real(cp) :: cosmic_scalingtime_today_normalized
-    
-    cosmic_scalingtime_today_normalized = cosmic_scalingtime_normalized(0._cp)
-
-  end function cosmic_scalingtime_today_normalized
-
-
+  
 
  function comoving_distance_today_normalized()
     implicit none
@@ -290,29 +207,6 @@ contains
   end function redshift_equality
 
 
-!makes t as a function of z continuous, but H discontinuous. Junctions
-!conditions require H continuous, therefore unsuitable for
-!perturbations
-  function redshift_crossing()
-    implicit none
-    real(cp) :: redshift_crossing
-
-    redshift_crossing = 9._cp*(1._cp + flParams%zeq)/16._cp - 1._cp
-
-  end function redshift_crossing
-
-
-!returns the radiation-era calH0 * conformal time at which rhomat=rhorad or
-!z=zeq. This is the shift for matter era solutions needed by
-!instantaneous transitions radiation matter.
-  function conformal_radtime_equality_normalized()
-    implicit none
-    real(cp) :: conformal_radtime_equality_normalized
-
-    conformal_radtime_equality_normalized = sqrt(flParams%OmegaR)/flParams%OmegaM
-    
-
-  end function conformal_radtime_equality_normalized
 
   
 
@@ -464,6 +358,8 @@ contains
   
   function redshift_normalized(cosmicTimeHo)
     use functools, only : easydverk
+    use flapprox, only : cosmic_radtime_normalized
+    use flapprox, only : redshift_radtime_normalized
     implicit none
     real(cp) :: redshift_normalized
     real(cp), intent(in) :: cosmicTimeHo
@@ -481,32 +377,45 @@ contains
     real(cp) :: scaleFactor,tHoDeepRad
     real(cp), dimension(neq) :: a,lna
 
-    
-    tHodeepRad = cosmic_radtime_normalized(zDeepRad)
+    logical, parameter :: useHighZApprox = .true.
 
-!rdof is constant in the SM for z>zdeeprad    
-    if (cosmicTimeHo.lt.tHoDeepRad) then
+    if (useHighZApprox) then
+    
+       tHodeepRad = cosmic_radtime_normalized(zDeepRad)
+
+!rdof is constant in the SM for z>zdeeprad, we do not need to
+!integrate anything nor invert thermal history formulae
+       if (cosmicTimeHo.lt.tHoDeepRad) then
 #ifndef THERMAL    
-       sqrtomR = sqrt(flParams%OmegaR)
+          sqrtomR = sqrt(flParams%OmegaR)
 #else
-       sqrtomR = sqrt(flParams%OmegaR * correction_rdof(zDeepRad))
+          sqrtomR = sqrt(flParams%OmegaR * correction_rdof(zDeepRad))
 #endif
 
-       redshift_normalized = 1._cp/sqrt(2._cp*cosmicTimeHo &
-            *sqrtomR) - 1._cp
-       return
-    endif
+          redshift_normalized = 1._cp/sqrt(2._cp*cosmicTimeHo &
+               *sqrtomR) - 1._cp
+          
+          return
+          
+       endif
 
-!that is very large redshift for which numerical integration may be inaccurate    
-    tsmallHo = cosmic_radtime_normalized(zbig)
-   
-    if (cosmicTimeHo.lt.tsmallHo) then
-       redshift_normalized = redshift_radtime_normalized(cosmicTimeHo,Q=1._cp)
-       return
+!zbig is very large redshift for which numerical integration may be
+!inaccurate, in the range zbig, zdeeprad, we can skip numerical
+!integration but still need to invert thermal history algebraic
+!equations
+       tsmallHo = cosmic_radtime_normalized(zbig)
+
+       if (cosmicTimeHo.lt.tsmallHo) then
+
+          redshift_normalized = redshift_radtime_normalized(cosmicTimeHo,Q=1._cp)
+
+          return
+          
+       endif
+
     endif
-    
-    
-!let's integrate    
+       
+!Exact integration in between, or all the time is useHighZApprox is false
 
     tnowHo = cosmic_time_normalized(0._cp)
     a = 1._cp
@@ -558,6 +467,8 @@ contains
 
 
 
+
+  
    
 !a^2 H/Ho  
 #ifndef THERMAL
@@ -567,52 +478,13 @@ contains
     real(cp) :: hubble_normalized_scalefactor_square
     real(cp), intent(in) :: scaleFactor
 
-    hubble_normalized_scalefactor_square &
-         = sqrt(flParams%OmegaR + flParams%OmegaM*scaleFactor &
-         + flParams%OmegaL*scaleFactor**4 &
-         + flParams%OmegaK* scaleFactor**2)
+    hubble_normalized_scalefactor_square = nothermal_hubble_normalized_scalefactor_square(scaleFactor)
     
   end function hubble_normalized_scalefactor_square
 
-!to potentially implement a step like minimal thing
-  function correction_rdof(z)
-    implicit none
-    real(cp), intent(in) :: z
-    real(cp) :: correction_rdof
-    
-    correction_rdof = 1._cp
-    
-  end function correction_rdof
-
-  
-  function entropy_correction_rdof(z)
-    real(cp), intent(in) :: z
-    real(cp) :: entropy_correction_rdof
-
-
-    entropy_correction_rdof = 1._cp
-    
-  end function entropy_correction_rdof
-
   
 #else  
-
-
-  function nothermal_hubble_normalized_scalefactor_square(scaleFactor)
-    implicit none
-    real(cp) :: nothermal_hubble_normalized_scalefactor_square
-    real(cp), intent(in) :: scaleFactor
-
-    nothermal_hubble_normalized_scalefactor_square &
-         = sqrt(flParams%OmegaR + flParams%OmegaM*scaleFactor &
-         + flParams%OmegaL*scaleFactor**4 &
-         + flParams%OmegaK* scaleFactor**2)
-
-  end function nothermal_hubble_normalized_scalefactor_square
-
- 
-
-  
+    
   function hubble_normalized_scalefactor_square(scaleFactor)
     implicit none
     real(cp) :: hubble_normalized_scalefactor_square
@@ -630,63 +502,26 @@ contains
   end function hubble_normalized_scalefactor_square
 
 
-
-
-!one spline evaluation
-  function correction_rdof(z)
-    use rdof, only : dp, correction_rdof_z
-    implicit none
-    real(cp), intent(in) :: z
-    real(cp) :: correction_rdof
-    
-    correction_rdof = correction_rdof_z(real(z,dp))
-    
-  end function correction_rdof
   
-  
-  
-!requires two spline evaluations
-  function old_correction_rdof(z)
-    use rdof, only : dp, energy_rdof_z, entropy_rdof_z
-    implicit none
-    real(cp), intent(in) :: z
-    real(cp) :: old_correction_rdof
-    real(cp), parameter :: fourthird = 4._cp/3._cp
-    real(cp) :: g,q,go,qo
-    real(dp) :: redshift
-
-    redshift = real(z,dp)
-    
-    g = real(energy_rdof_z(redshift),cp)
-    q = real(entropy_rdof_z(redshift),cp)
-
-    go = real(energy_rdof_z(0._dp),cp)
-    qo = real(entropy_rdof_z(0._dp),cp)
-
-    old_correction_rdof = g/go * (qo/q)**fourthird
-    
-  end function old_correction_rdof
-
-
-  function entropy_correction_rdof(z)
-    use rdof, only : dp, entropy_rdof_z
-    real(cp) :: entropy_correction_rdof
-    real(cp), intent(in) :: z
-    real(dp) :: redshift
-
-    redshift = real(z,dp)
-
-    entropy_correction_rdof = (real(entropy_rdof_z(redshift),cp)/flParams%qo)
-    
-  end function entropy_correction_rdof
-
   
 #endif
   
-
-     
   
+  function nothermal_hubble_normalized_scalefactor_square(scaleFactor)
+    implicit none
+    real(cp) :: nothermal_hubble_normalized_scalefactor_square
+    real(cp), intent(in) :: scaleFactor
 
+    nothermal_hubble_normalized_scalefactor_square &
+         = sqrt(flParams%OmegaR + flParams%OmegaM*scaleFactor &
+         + flParams%OmegaL*scaleFactor**4 &
+         + flParams%OmegaK* scaleFactor**2)
+
+  end function nothermal_hubble_normalized_scalefactor_square
+
+ 
+
+  
   function hubble_normalized(z)
     implicit none
     real(cp) :: hubble_normalized
@@ -702,580 +537,7 @@ contains
   end function hubble_normalized
   
   
-
-
-!!!!!some approximated functions for fast evaluations, scaling time
-!!!!!refers to pure matter and pure radiation
-
-
-  
-  
-  function cp_cosmic_scalingtime(redshift)
-    implicit none
-    real(cp) :: cp_cosmic_scalingtime
-    real(cp), intent(in) :: redshift
-    
-    cp_cosmic_scalingtime = cp_cosmic_scalingtime_normalized(redshift)/flParams%hubbleToday
-
-  end function cp_cosmic_scalingtime
-
-
-  
-  function ep_cosmic_scalingtime(redshift)
-    implicit none
-    real(cep) :: ep_cosmic_scalingtime
-    real(cep), intent(in) :: redshift
-    
-    ep_cosmic_scalingtime = ep_cosmic_scalingtime_normalized(redshift)/real(flParams%hubbleToday,cep)
-
-  end function ep_cosmic_scalingtime
-
-
-  
-  function cp_cosmic_scalingtime_normalized(redshift)
-    implicit none
-    real(cp) :: cp_cosmic_scalingtime_normalized
-    real(cp), intent(in) :: redshift
-
-    real(cp) :: zcross
-    
-    zcross = redshift_crossing()
-
-    if (redshift.gt.zcross) then
-       cp_cosmic_scalingtime_normalized = cp_cosmic_radtime_normalized(redshift)
-    elseif (redshift.le.zcross) then
-       cp_cosmic_scalingtime_normalized = cp_cosmic_mattime_normalized(redshift)
-    else
-       write(*,*)'redshift= ',redshift
-       stop 'cp_cosmic_scalingtime_normalized: internal error!'
-    endif
-
-  end function cp_cosmic_scalingtime_normalized
-  
-
-
-  
-  function ep_cosmic_scalingtime_normalized(redshift)
-    implicit none
-    real(cep) :: ep_cosmic_scalingtime_normalized
-    real(cep), intent(in) :: redshift
-
-    real(cep) :: zcross
-    
-    zcross = real(redshift_crossing(),cep)
-
-    if (redshift.gt.zcross) then
-       ep_cosmic_scalingtime_normalized = ep_cosmic_radtime_normalized(redshift)
-    elseif (redshift.le.zcross) then
-       ep_cosmic_scalingtime_normalized = ep_cosmic_mattime_normalized(redshift)
-    else
-       write(*,*)'redshift= ',redshift
-       stop 'ep_cosmic_scalingtime_normalized: internal error!'
-    endif
-
-  end function ep_cosmic_scalingtime_normalized
-  
-
-  
-
-  
-  function cp_cosmic_mattime(redshift)
-    implicit none
-!pure matter era
-    real(cp) :: cp_cosmic_mattime
-    real(cp), intent(in) :: redshift
-
-    cp_cosmic_mattime = cp_cosmic_mattime_normalized(redshift)/flParams%hubbleToday
-    
-  end function cp_cosmic_mattime
-
-
-  
-
-  function ep_cosmic_mattime(redshift)
-    implicit none
-!pure matter era
-    real(cep) :: ep_cosmic_mattime
-    real(cep), intent(in) :: redshift
-
-    ep_cosmic_mattime = ep_cosmic_mattime_normalized(redshift)/real(flParams%hubbleToday,cep)
-    
-  end function ep_cosmic_mattime
-
-  
-  
-  
-  function cp_cosmic_mattime_normalized(redshift)
-    implicit none
-!pure matter era
-    real(cp) :: cp_cosmic_mattime_normalized
-    real(cp), intent(in) :: redshift
-
-    real(cp) :: sqrtomM
-
-    sqrtomM = sqrt(flParams%OmegaM)
-    
-    cp_cosmic_mattime_normalized = 2._cp/(3._cp &
-         * sqrtomM)/(1._cp + redshift)**(3._cp/2._cp)
-    
-  end function cp_cosmic_mattime_normalized
-
-
-
-  function ep_cosmic_mattime_normalized(redshift)
-    implicit none
-!pure matter era
-    real(cep) :: ep_cosmic_mattime_normalized
-    real(cep), intent(in) :: redshift
-
-    real(cep) :: sqrtomM
-    
-    sqrtomM = sqrt(real(flParams%OmegaM,cep))
-    
-    ep_cosmic_mattime_normalized = 2._cep/(3._cep &
-         * sqrtomM)/(1._cep + redshift)**(3._cep/2._cep)
-    
-  end function ep_cosmic_mattime_normalized
-  
-
-  
-  function cp_cosmic_radtime(redshift)
-    implicit none
-!pure radiation era or THERMAL leading order
-    real(cp) :: cp_cosmic_radtime
-    real(cp), intent(in) :: redshift
-    
-    cp_cosmic_radtime = cp_cosmic_radtime_normalized(redshift)/flParams%hubbleToday
-       
-  end function cp_cosmic_radtime
-
-
-
-  
-  function ep_cosmic_radtime(redshift)
-    implicit none
-!pure radiation era or THERMAL leading order
-    real(cep) :: ep_cosmic_radtime
-    real(cep), intent(in) :: redshift
-    
-    ep_cosmic_radtime = ep_cosmic_radtime_normalized(redshift)/real(flParams%hubbleToday,cep)
-       
-  end function ep_cosmic_radtime
-  
-  
-  
-  function cp_cosmic_radtime_normalized(redshift)
-    implicit none
-    !pure radiation era
-    real(cp) :: cp_cosmic_radtime_normalized
-    real(cp), intent(in) :: redshift
-
-    real(cp) :: sqrtomR
-
-    
-#ifndef THERMAL    
-    sqrtomR = sqrt(flParams%OmegaR)
-#else
-!this is only the leading order term of an expansion in correction_rdof derivatives
-    sqrtomR = sqrt(flParams%OmegaR * correction_rdof(redshift))
-#endif
-    
-    cp_cosmic_radtime_normalized = 1._cp/(2._cp &
-         * sqrtomR)/(1._cp + redshift)**2
-
-  end function cp_cosmic_radtime_normalized
-
-
-
-  
-  function ep_cosmic_radtime_normalized(redshift)
-    implicit none
-!pure radiation era
-    real(cep) :: ep_cosmic_radtime_normalized
-    real(cep), intent(in) :: redshift
-
-    real(cep) :: sqrtomR
-
-#ifndef THERMAL
-    sqrtomR = sqrt(real(flParams%OmegaR,cep))
-#else
-    sqrtomR = sqrt(real(flParams%OmegaR*correction_rdof(real(redshift,cp)),cep))
-#endif
-    
-    ep_cosmic_radtime_normalized = 1._cep/(2._cep &
-         * sqrtomR )/(1._cep + redshift)**2
-       
-  end function ep_cosmic_radtime_normalized
-
-
-
-
-  
-  function cp_redshift_scalingtime(cosmicTime)
-    implicit none
-    real(cp) :: cp_redshift_scalingtime
-    real(cp), intent(in) :: cosmicTime
-
-    cp_redshift_scalingtime = cp_redshift_scalingtime_normalized(cosmicTime*flParams%hubbleToday)
-    
-  end function cp_redshift_scalingtime
-
-
-
-
-  function ep_redshift_scalingtime(cosmicTime)
-    implicit none
-    real(cep) :: ep_redshift_scalingtime
-    real(cep), intent(in) :: cosmicTime
-
-    ep_redshift_scalingtime = ep_redshift_scalingtime_normalized(cosmicTime*real(flParams%hubbleToday,cep))
-    
-  end function ep_redshift_scalingtime
-  
-
-
-  
-  
-  function cp_redshift_scalingtime_normalized(cosmicTimeHo)
-    implicit none
-    real(cp) :: cp_redshift_scalingtime_normalized
-    real(cp), intent(in) :: cosmicTimeHo
-
-    real(cp):: zcross, tcrossHo
-    real(cp) :: zeq, sqrtomM
-    
-    sqrtomM = sqrt(flParams%OmegaM)
-    zcross = redshift_crossing()
-    tcrossHo = cp_cosmic_radtime_normalized(zcross)
-   
-    if (cosmicTimeHo.lt.tcrossHo) then
-       cp_redshift_scalingtime_normalized = cp_redshift_radtime_normalized(cosmicTimeHo,Q=1._cp)
-    elseif (cosmicTimeHo.ge.tcrossHo) then
-       cp_redshift_scalingtime_normalized = (2._cp/(3._cp*cosmicTimeHo &
-            * sqrtomM))**(2._cp/3._cp) - 1._cp
-    else
-       write(*,*)'tHo= ',cosmicTimeHo
-       stop 'cp_redshift_scalingtime_normalized: t screwed!'
-    endif
-  end function cp_redshift_scalingtime_normalized
-
-
- 
-
-  function ep_redshift_scalingtime_normalized(cosmicTimeHo)
-    implicit none
-    real(cep) :: ep_redshift_scalingtime_normalized
-    real(cep), intent(in) :: cosmicTimeHo
-
-    real(cep):: zcross, tcrossHo, sqrtomM
-
-    sqrtomM = sqrt(real(flParams%OmegaM,cep))    
-    zcross = real(redshift_crossing(),cep)
-    tcrossHo = ep_cosmic_radtime_normalized(zcross)
-   
-    if (cosmicTimeHo.lt.tcrossHo) then
-       ep_redshift_scalingtime_normalized = ep_redshift_radtime_normalized(cosmicTimeHo,Q=1._cep)
-    elseif (cosmicTimeHo.ge.tcrossHo) then
-       ep_redshift_scalingtime_normalized = (2._cep/(3._cep*cosmicTimeHo &
-            * sqrtomM))**(2._cep/3._cep) - 1._cep
-    else
-       stop 'ep_redshift_scalingtime_normalized: t screwed!'
-    endif
-  end function ep_redshift_scalingtime_normalized
-
-
-
-  function brent_redshift_radtime_normalized(cosmicTimeHo)
-    use functools, only : brent
-    implicit none
-    real(cp), intent(in) :: cosmicTimeHo
-    real(cp) :: brent_redshift_radtime_normalized
-
-    real(cp) :: lnzp1min, lnzp1max
-    real(cp), parameter :: tol = tolfl
-    
-    lnzp1min = 0._cp
-    lnzp1max = log(big)/4._cp
-    statbuffer = cosmicTimeHo
-    
-     brent_redshift_radtime_normalized &
-         = exp(brent(lnzp1min,lnzp1max,find_brent_redshift_radtime_normalized,tol)) - 1._cp
-    
-
-  end function brent_redshift_radtime_normalized
-
-
-  function find_brent_redshift_radtime_normalized(lnzp1)
-    implicit none
-    real(cp) :: find_brent_redshift_radtime_normalized
-    real(cp), intent(in) :: lnzp1
-
-    real(cp) :: zp1,tHo
-    
-    zp1 = exp(lnzp1)
-    tHo = cosmic_radtime_normalized(zp1-1._cp)
-    
-    find_brent_redshift_radtime_normalized = tHo - statbuffer
-    
-  end function find_brent_redshift_radtime_normalized
-
-
-  
-  
-  
-  recursive function cp_redshift_radtime_normalized(cosmicTimeHo,Q,y) result(z)
-    implicit none
-    real(cp), intent(in) :: cosmicTimeHo
-    real(cp), intent(in), optional :: Q,y
-    real(cp) :: z, dz
-
-    real(cp), parameter :: tol = tolfl
-    
-    real(cp) :: sqrtomR
-
-    if (present(Q)) then
-       sqrtomR = sqrt(flParams%OmegaR*Q)
-    else
-       sqrtomR = sqrt(flParams%OmegaR)
-    endif
-
-    z = 1._cp/sqrt(2._cp*sqrtomR*cosmicTimeHo) - 1._cp
-    
-#ifdef THERMAL
-    if (.not.present(Q)) return
-    if (present(y)) then
-       dz = 2*(y - z)/(y + z)
-       if (abs(dz).lt.tol) return
-    endif
-    z = cp_redshift_radtime_normalized(cosmicTimeHo,correction_rdof(z),z)
-#endif    
-    
-  end function cp_redshift_radtime_normalized
-  
-
-
-
-  recursive function ep_redshift_radtime_normalized(cosmicTimeHo,Q,y) result(z)
-    implicit none
-    real(cep), intent(in) :: cosmicTimeHo
-    real(cep), intent(in), optional :: Q,y
-    real(cep) :: z, dz
-
-    real(cep), parameter :: tol = tolfl
-    
-    real(cep) :: sqrtomR
-
-    if (present(Q)) then
-       sqrtomR = sqrt(real(flParams%OmegaR,cep)*Q)
-    else
-       sqrtomR = sqrt(real(flParams%OmegaR,cep))
-    endif
-
-    z = 1._cep/sqrt(2._cep*sqrtomR*cosmicTimeHo) - 1._cep
-    
-#ifdef THERMAL
-    if (.not.present(Q)) return
-    if (present(y)) then
-       dz = 2*(y - z)/(y + z)
-       if (abs(dz).lt.tol) return
-    endif
-    z = ep_redshift_radtime_normalized(cosmicTimeHo,real(correction_rdof(real(z,cp)),cep),z)
-#endif    
-    
-  end function ep_redshift_radtime_normalized
-  
-  
-
-
-
-  
-
-  recursive function redshift_conformal_radmattime_normalized(etaHo,Q,y) result(z)
-    implicit none
-    real(cp) :: z
-    real(cp), intent(in) :: etaHo
-    real(cp), intent(in), optional :: Q,y
-
-    real(cp), parameter :: tol = tolfl
-
-    real(cp) :: sqrtomR, omRoM
-    real(cp) :: scaleFactor, dz
-    
-    if (present(Q)) then
-       sqrtomR = sqrt(flParams%OmegaR*Q)
-    else
-       sqrtomR = sqrt(flParams%OmegaR)
-    endif
-
-    
-    scaleFactor = 0.25_cp*flParams%OmegaM * etaHo*etaHo + sqrtomR * etaHo
-    
-    z = 1._cp/scaleFactor - 1._cp
-    
-#ifdef THERMAL
-    if (.not.present(Q)) return
-    if (present(y)) then
-       dz = 2*(y - z)/(y + z)
-       if (abs(dz).lt.tol) return
-    endif
-    z = redshift_conformal_radmattime_normalized(etaHo,correction_rdof(z),z)
-#endif    
-
-    
-  end function redshift_conformal_radmattime_normalized
-
-
-
-
-
-
-!returns etaHo from redshift, approximated if thermal is on
-  function conformal_radmattime_normalized(z)
-    implicit none
-    real(cp) :: conformal_radmattime_normalized
-    real(cp), intent(in) :: z
-
-    real(cp) ::  scaleFactor
-    real(cp) :: Q
-
-    Q = 1._cp
-    scaleFactor = 1._cp / (1._cp + z)
-
-#ifdef THERMAL
-    Q = correction_rdof(z)
-#endif
-    
-    conformal_radmattime_normalized = 2._cp * scaleFactor &
-         / ( sqrt(flParams%OmegaR*Q + flParams%OmegaM*scaleFactor) &
-         + sqrt(flParams%OmegaR*Q) ) 
-        
-  end function conformal_radmattime_normalized
-
-
-
-
-
-
-
-  
-  
-  
-!returns z such that Ho t(z)(1+z) = Hotoa  
-  function cp_redshift_toa_scalingtime_normalized(Hotoa)
-    implicit none
-    real(cp) :: cp_redshift_toa_scalingtime_normalized
-    real(cp), intent(in) :: Hotoa
-
-    real(cp) :: zcross, Hotoacross, omM
-
-    omM = flParams%OmegaM
-    
-    zcross = redshift_crossing()
-    Hotoacross = cp_cosmic_radtime_normalized(zcross)*(1._cp + zcross)
-    
-    if (Hotoa.lt.Hotoacross) then
-       cp_redshift_toa_scalingtime_normalized = cp_redshift_toa_radtime_normalized(Hotoa,Q=1._cp)
-    elseif (Hotoa.ge.Hotoacross) then
-       cp_redshift_toa_scalingtime_normalized = 4._cp/(9._cp*Hotoa*Hotoa*omM) - 1._cp
-    else
-       stop 'cp_redshift_toa_scalingtime_normalized: screwed!'
-    endif
-    
-  end function cp_redshift_toa_scalingtime_normalized
-
-
-
-  
-  function ep_redshift_toa_scalingtime_normalized(Hotoa)
-    implicit none
-    real(cep) :: ep_redshift_toa_scalingtime_normalized
-    real(cep), intent(in) :: Hotoa
-
-    real(cep) :: zcross, Hotoacross, omM
-
-    omM = real(flParams%OmegaM,cep)
-    
-    zcross = real(redshift_crossing(),cep)
-    Hotoacross = ep_cosmic_radtime_normalized(zcross) * (1._cep + zcross)
-
-    if (Hotoa.lt.Hotoacross) then
-       ep_redshift_toa_scalingtime_normalized =  ep_redshift_toa_radtime_normalized(Hotoa,Q=1._cep)
-    elseif (Hotoa.ge.Hotoacross) then
-       ep_redshift_toa_scalingtime_normalized = 4._cep/(9._cep*Hotoa*Hotoa*omM) - 1._cep
-    else
-       stop 'ep_redshift_toa_scalingtime_normalized: screwed!'
-    endif
-
-  end function ep_redshift_toa_scalingtime_normalized
-  
-
-
-
-  recursive function cp_redshift_toa_radtime_normalized(Hotoa,Q,y) result(z)
-    implicit none
-    real(cp), intent(in) :: Hotoa
-    real(cp), intent(in), optional :: Q, y
-    real(cp) :: z
-
-    real(cp), parameter :: tol = tolfl
-    
-    real(cp) :: sqrtomR, dz
-
-    if (present(Q)) then
-       sqrtomR = sqrt(flParams%OmegaR*Q)
-    else
-       sqrtomR = sqrt(flParams%OmegaR)
-    endif
-
-    z = 1._cp/(2._cp*Hotoa*sqrtomR) - 1._cp
-               
-#ifdef THERMAL
-    if (.not.present(Q)) return
-    if (present(y)) then
-       dz = 2*(y - z)/(y + z)
-       if (abs(dz).lt.tol) return
-    endif
-    z = cp_redshift_toa_radtime_normalized(Hotoa,correction_rdof(z),z)
-#endif    
-    
-  end function cp_redshift_toa_radtime_normalized
-
-  
-
-  recursive function ep_redshift_toa_radtime_normalized(Hotoa,Q,y) result(z)
-    implicit none
-    real(cep), intent(in) :: Hotoa
-    real(cep), intent(in) , optional :: Q,y
-    real(cep) :: z
-    
-    real(cep), parameter :: tol = tolfl
-
-    real(cep) :: sqrtomR, dz   
-
-    if (present(Q)) then
-       sqrtomR = sqrt(real(flParams%OmegaR,cep)*Q)
-    else
-       sqrtomR = sqrt(flParams%OmegaR)
-    endif
-        
-    z = 1._cep/(2._cep*Hotoa*sqrtomR) - 1._cep
-    
-#ifdef THERMAL
-    if (.not.present(Q)) return
-    if (present(y)) then
-       dz = 2*(y - z)/(y + z)
-       if (abs(dz).lt.tol) return
-    endif
-    z = ep_redshift_toa_radtime_normalized(Hotoa,real(correction_rdof(real(z,cp)),cep),z)
-#endif
-    
-  end function ep_redshift_toa_radtime_normalized
-
-
-  
-  
-  
-!returns z such that Ho Chi(z) (1+z) = Hochioa
+  !returns z such that Ho Chi(z) (1+z) = Hochioa
   function redshift_chioa_normalized(Hochioa)
     use functools, only : brent
     implicit none
@@ -1308,51 +570,7 @@ contains
     
   end function find_redshift_chioa_normalized
 
-
   
 
-!returns z such that  Ho t(z) (1+z) [Chi(z)/t(z)]^alpha = numval
-  function redshift_tchipower_scalingtime_normalized(alpha,numval)
-    use functools, only : brent
-    implicit none
-    real(cp) :: redshift_tchipower_scalingtime_normalized
-    real(cp), intent(in) :: alpha,numval
-
-    real(cp) :: lnzp1min, lnzp1max, lnzp1
-    real(cp), parameter :: tol = tolfl
-
-    
-    lnzp1min = 0._cp
-    lnzp1max = log(big)/2._cp
-    statbuffer = numval
-    statpower = alpha
-    
-    lnzp1 = brent(lnzp1min,lnzp1max,find_redshift_tchipower_scalingtime_normalized,tol)
-    
-    redshift_tchipower_scalingtime_normalized = exp(lnzp1) - 1._cp
-         
-  end function redshift_tchipower_scalingtime_normalized
-
-  function find_redshift_tchipower_scalingtime_normalized(lnzp1)
-    implicit none
-    real(cp) :: find_redshift_tchipower_scalingtime_normalized
-    real(cp), intent(in) :: lnzp1
-
-    real(cp) :: zp1,Hochi,Hot
-
-    if (lnzp1.eq.0._cp) then
-       find_redshift_tchipower_scalingtime_normalized = -statbuffer
-       return
-    endif
-    
-    zp1 = exp(lnzp1)
-    
-    Hochi = comoving_distance_normalized(zp1-1._cp)
-    Hot = cosmic_scalingtime_normalized(zp1-1._cp)
-    
-    find_redshift_tchipower_scalingtime_normalized = zp1*Hot*(Hochi/Hot)**statpower - statbuffer
-    
-  end function find_redshift_tchipower_scalingtime_normalized
-  
   
 end module flrw
