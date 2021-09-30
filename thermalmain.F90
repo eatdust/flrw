@@ -14,9 +14,9 @@ program thermalmain
   real(dp) :: zp1,z,a
   real(dp) :: lnzp1min, lnzp1max
   
-  real(dp) :: qstar, gstar, zcross
+  real(dp) :: qstar, gstar, zeq
 
-  real(dp) :: tHo, tscalHo, tradHo, tmatHo
+  real(dp) :: tHo, tscalHo, tradHo, tpmatHo,timatHo
 
   real(dp) :: etaHoEx, etaHoApp
   
@@ -63,10 +63,14 @@ program thermalmain
   lnzp1min = 0.1_dp
   lnzp1max = 40._dp
 
-  print *,'zeq=',redshift_equality()
+  zeq = redshift_equality()
+  
+  print *,'zeq=',zeq
 
 !  read(*,*)
-    print *,'test',cosmic_mattime_normalized(zcross),cosmic_radtime_normalized(zcross)
+  print *,'test',cosmic_puremattime_normalized(zeq) &
+       ,cosmic_instmattime_normalized(zeq) &
+       ,cosmic_radtime_normalized(zeq)
   
   do i = 1, npoints
      zp1 = exp(lnzp1min + real(i-1,dp)*(lnzp1Max - lnzp1Min) &
@@ -77,7 +81,8 @@ program thermalmain
      x = x_rdof(z)
 
      tHo = cosmic_time_normalized(z)
-     tmatHo = cosmic_mattime_normalized(z)
+     timatHo = cosmic_instmattime_normalized(z)
+     tpmatHo = cosmic_puremattime_normalized(z)
      tradHo = cosmic_radtime_normalized(z)
 
      a = 1._dp/(1._dp + z)
@@ -92,7 +97,7 @@ program thermalmain
 
      call livewrite('eta.dat',z,etaHoEx)
      
-     call livewrite('times.dat',z,tHo,tmatHo,tradHo)
+     call livewrite('times.dat',z,tHo,tpmatHo,timatHo,tradHo)
      
      call livewrite('gandqstar_z.dat',x*To/GeV,gstar,qstar)
 
