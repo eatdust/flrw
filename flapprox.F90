@@ -11,6 +11,7 @@ module flapprox
   
   private
 
+      
   interface cosmic_puremattime
      module procedure cp_cosmic_puremattime, ep_cosmic_puremattime
   end interface cosmic_puremattime
@@ -42,7 +43,7 @@ module flapprox
   interface redshift_toa_instmattime_normalized
      module procedure cp_redshift_toa_instmattime_normalized, ep_redshift_toa_instmattime_normalized
   end interface redshift_toa_instmattime_normalized
-  
+
   interface cosmic_radtime
      module procedure cp_cosmic_radtime, ep_cosmic_radtime
   end interface cosmic_radtime
@@ -59,7 +60,46 @@ module flapprox
      module procedure cp_redshift_toa_radtime_normalized, ep_redshift_toa_radtime_normalized
   end interface redshift_toa_radtime_normalized
 
+!INSTMAT stands for matter era with a smooth transition RAD->MAT at zeq
+#ifdef INSTMAT
+  
+  interface cosmic_mattime
+     module procedure cp_cosmic_instmattime, ep_cosmic_instmattime
+  end interface cosmic_mattime
 
+  interface cosmic_mattime_normalized
+     module procedure cp_cosmic_instmattime_normalized, ep_cosmic_instmattime_normalized
+  end interface cosmic_mattime_normalized
+
+  interface redshift_mattime_normalized
+     module procedure cp_redshift_instmattime_normalized, ep_redshift_instmattime_normalized 
+  end interface redshift_mattime_normalized
+
+  interface redshift_toa_mattime_normalized
+     module procedure cp_redshift_toa_instmattime_normalized, ep_redshift_toa_instmattime_normalized
+  end interface redshift_toa_mattime_normalized
+
+!PUREMAT default behaviour  
+#else
+  
+  interface cosmic_mattime
+     module procedure cp_cosmic_puremattime, ep_cosmic_puremattime
+  end interface cosmic_mattime
+
+   interface cosmic_mattime_normalized
+     module procedure cp_cosmic_puremattime_normalized, ep_cosmic_puremattime_normalized
+  end interface cosmic_mattime_normalized
+
+  interface redshift_mattime_normalized
+     module procedure cp_redshift_puremattime_normalized, ep_redshift_puremattime_normalized 
+  end interface redshift_mattime_normalized
+
+  interface redshift_toa_mattime_normalized
+     module procedure cp_redshift_toa_puremattime_normalized, ep_redshift_toa_puremattime_normalized
+  end interface redshift_toa_mattime_normalized
+
+#endif  
+  
   real(cp), save :: statbuffer
 !$omp threadprivate(statbuffer)  
 
@@ -67,11 +107,17 @@ module flapprox
   public cosmic_puremattime, cosmic_puremattime_normalized
   public redshift_puremattime_normalized
   public redshift_toa_puremattime_normalized
+  public conformal_puremattime_normalized
   
 !matter era after instantaneous transition
   public cosmic_instmattime, cosmic_instmattime_normalized
+  public conformal_instmattime_normalized
   public redshift_instmattime_normalized
   public redshift_toa_instmattime_normalized
+
+!alias of either one of the other
+  public cosmic_mattime, cosmic_mattime_normalized
+  public redshift_mattime_normalized, redshift_toa_mattime_normalized
   
 !pure radiation era  
   public cosmic_radtime, cosmic_radtime_normalized  
@@ -207,6 +253,22 @@ contains
    
   end function ep_redshift_toa_puremattime_normalized
   
+
+
+
+  function conformal_puremattime_normalized(z)
+    implicit none
+    real(cp) :: conformal_puremattime_normalized
+    real(cp), intent(in) :: z
+
+    conformal_puremattime_normalized = 2._cp / sqrt(flParams%OmegaM * (1._cp + z))
+
+  end function conformal_puremattime_normalized
+
+
+
+
+
   
   
   function cp_cosmic_radtime(redshift)
@@ -627,7 +689,8 @@ contains
 
   
   
-
+  
+  
 
 !mixture of radiation and matter
 
@@ -646,7 +709,6 @@ contains
 #ifdef THERMAL
     Q = correction_rdof(z)
 #endif
-    
     conformal_radmattime_normalized = 2._cp * scaleFactor &
          / ( sqrt(flParams%OmegaR*Q + flParams%OmegaM*scaleFactor) &
          + sqrt(flParams%OmegaR*Q) ) 

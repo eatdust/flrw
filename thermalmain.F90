@@ -7,7 +7,7 @@ program thermalmain
 
   implicit none
   
-  real(dp) :: x
+  real(dp) :: x,y
   real(dp) :: lnxmin, lnxmax
   real(dp), dimension(:), allocatable :: xdata, qdata, gdata, adata, cdata
 
@@ -18,7 +18,7 @@ program thermalmain
 
   real(dp) :: tHo, tscalHo, tradHo, tpmatHo,timatHo
 
-  real(dp) :: etaHoEx, etaHoApp
+  real(dp) :: etaHoEx, etaHoIMat, etaHoRadMat,etaHoPMat
   
   integer :: npoints
   integer :: i
@@ -34,7 +34,7 @@ program thermalmain
   
 
   call set_fiducial_flparams()
-
+  
 #ifndef THERMAL
   call set_splines()
 #endif
@@ -59,6 +59,7 @@ program thermalmain
   call delete_file('hubble_z.dat')
   call delete_file('rdofcorr.dat')
   call delete_file('times.dat')
+  call delete_file('eta.dat')
   
   lnzp1min = 0.1_dp
   lnzp1max = 40._dp
@@ -68,9 +69,10 @@ program thermalmain
   print *,'zeq=',zeq
 
 !  read(*,*)
-  print *,'test',cosmic_puremattime_normalized(zeq) &
-       ,cosmic_instmattime_normalized(zeq) &
-       ,cosmic_radtime_normalized(zeq)
+  print *,'tpuremat(zeq)= ',cosmic_puremattime_normalized(zeq)
+  print *,'tinstmat(zeq)= ',cosmic_instmattime_normalized(zeq)
+  print *,'tpurerad(zeq)= ',cosmic_radtime_normalized(zeq)
+  print *,'texact(zeq)  = ',cosmic_time_normalized(zeq)
   
   do i = 1, npoints
      zp1 = exp(lnzp1min + real(i-1,dp)*(lnzp1Max - lnzp1Min) &
@@ -88,14 +90,20 @@ program thermalmain
      a = 1._dp/(1._dp + z)
 
      x = redshift_radtime_normalized(tradHo,Q=1._dp)
-
+     
 !     x = redshift_toa_radtime_normalized(tradHo/a,Q=1._dp)
 !     print *,'scaling z= x-z= ',z,(x-z)/(x+z)*2
 
      etaHoEx = conformal_time_normalized(z)
+     etaHoPMat = conformal_puremattime_normalized(z)
+     etaHoIMat = conformal_instmattime_normalized(z)
+     etaHoRadMat = conformal_radmattime_normalized(z)
 
+     y = redshift_conformal_radmattime_normalized(etaHoRadMat,Q=1._dp)
 
-     call livewrite('eta.dat',z,etaHoEx)
+!     print *,'redshifts= ',z,x,y
+     
+     call livewrite('eta.dat',z,etaHoEx,etaHoRadMat,etaHoPMat,etaHoIMat)
      
      call livewrite('times.dat',z,tHo,tpmatHo,timatHo,tradHo)
      
