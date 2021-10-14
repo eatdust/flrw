@@ -18,9 +18,10 @@ module rdof
   
   real(dp), dimension(:), allocatable :: xknots, zknots
   real(dp), dimension(:), allocatable :: gxbcoef, qxbcoef
-  real(dp), dimension(:), allocatable :: gzbcoef, qzbcoef, czbcoef
+  real(dp), dimension(:), allocatable :: gzbcoef, qzbcoef
   real(dp), dimension(:), allocatable :: xbcoef, zbcoef
-
+  real(dp), dimension(:), allocatable :: czbcoef, wp1zbcoef
+  
 !max number of records in precomputed data file
   integer, parameter :: nrecmax = 300
   integer, parameter :: ncols = 3
@@ -34,17 +35,18 @@ module rdof
   real(dp), parameter :: MpInK = MpInGeV*GeV
 
   
-  logical, parameter :: display = .false.
-!set it to true to generate binary preprocessed data in rdof.pp
+  logical, parameter :: display = .true.
+
+!define CREATEPP to generate binary preprocessed data in rdof.pp
 !from data file
-  logical, parameter :: createPP = .false.  
+
   
   public To, GeV, MpInK, dp
   
   public readump_data, preprocessed_data
   public set_splines, check_splines, free_splines
   public energy_rdof_x, entropy_rdof_x
-  public energy_rdof_z, entropy_rdof_z, correction_rdof_z
+  public energy_rdof_z, entropy_rdof_z, correction_rdof_z, eos_rdof_z
   public x_rdof, z_rdof
 contains
 
@@ -53,11 +55,11 @@ contains
 
   
 
-  subroutine readump_data(filename,xdata, qdata, gdata, zdata, cdata)
+  subroutine readump_data(filename,xdata, qdata, gdata, zdata, cdata, wp1data)
     implicit none
 
     character(len=*), intent(in) :: filename
-    real(dp), dimension(:), allocatable, intent(inout) :: xdata, qdata, gdata, zdata, cdata
+    real(dp), dimension(:), allocatable, intent(inout) :: xdata, qdata, gdata, zdata, cdata, wp1data
 
     integer, parameter :: nunit = 110
 
@@ -91,7 +93,7 @@ contains
 
     nrec = i-1
 
-    allocate(xdata(nrec),qdata(nrec),gdata(nrec),zdata(nrec), cdata(nrec))
+    allocate(xdata(nrec),qdata(nrec),gdata(nrec),zdata(nrec), cdata(nrec), wp1data(nrec))
     xdata = buffer(:,1)
     qdata = buffer(:,2)
     gdata = buffer(:,3)
@@ -107,38 +109,44 @@ contains
     zmax = zdata(1)
 
     cdata = correction_rdof_from_all(xdata,qdata/qdata(ndata),gdata/gdata(ndata))
+    wp1data = eosp1_rdof_from_all(xdata,qdata,gdata)
     
-    
-    if (createPP) then
-       open(unit=nunit,file='rdof.pp',status='new')
-       do i=1,nrec
-          write(nunit,*)'PPDATA(',i,',',xdata(i),',',qdata(i),',',gdata(i) &
-               ,',',zdata(i),',',cdata(i),')'
-       enddo
-       close(nunit)
-    endif
+#ifdef CREATEPP    
+    write(*,*)'readump_data: overwritting rdof.pp, press ENTER to proceed!'
+    read(*,*)
+    open(unit=nunit,file='rdof.pp',status='unknown')
+    do i=1,nrec
+       write(nunit,*)'PPDATA(',i,',',xdata(i),',',qdata(i),',',gdata(i) &
+            ,',',zdata(i),',',cdata(i),',',wp1data(i),')'
+    enddo
+    close(nunit)
+    write(*,*)'readump_data: new rdof.pp dumped!'
+#endif       
 
   end subroutine readump_data
 
  
   
-  subroutine preprocessed_data(xdata,qdata,gdata,zdata,cdata)
+  subroutine preprocessed_data(xdata,qdata,gdata,zdata,cdata,wp1data)
     implicit none
-    real(dp), dimension(nrecmax,ncols+2) :: buffer
-    real(dp), dimension(:), allocatable, intent(inout) :: xdata,qdata,gdata,zdata,cdata
+    real(dp), dimension(nrecmax,ncols+3) :: buffer
+    real(dp), dimension(:), allocatable, intent(inout) :: xdata,qdata,gdata,zdata,cdata,wp1data
     integer :: i,nrec
 
     buffer = -1._dp
-    
-#define PPDATA(fooidx,foox,fooq,foog,fooa,fooc) \
+
+#define PPDATA(fooidx,foox,fooq,foog,fooa,fooc,foow) \
     buffer(fooidx,1) = foox; \
     buffer(fooidx,2) = fooq; \
     buffer(fooidx,3) = foog ; \
     buffer(fooidx,4) = fooa ; \
-    buffer(fooidx,5) = fooc
+    buffer(fooidx,5) = fooc ; \
+    buffer(fooidx,6) = foow
+#ifndef CREATEPP
 #include "rdof.pp"
+#endif    
 #undef PPDATA
-
+ 
     do i=1,nrecmax
        if (buffer(i,1).eq.-1._dp) exit
     enddo
@@ -151,12 +159,13 @@ contains
 
     nrec = i-1
 
-    allocate(xdata(nrec),qdata(nrec),gdata(nrec),zdata(nrec),cdata(nrec))
+    allocate(xdata(nrec),qdata(nrec),gdata(nrec),zdata(nrec),cdata(nrec),wp1data(nrec))
     xdata = buffer(:,1)
     qdata = buffer(:,2)
     gdata = buffer(:,3)
     zdata = buffer(:,4)
     cdata = buffer(:,5)
+    wp1data = buffer(:,6)
     
     ndata = nrec
     xmin = xdata(ndata)
@@ -185,7 +194,8 @@ contains
        if ((.not.allocated(gxbcoef)).or.(.not.allocated(qxbcoef)) &
             .or.(.not.allocated(xbcoef)).or.(.not.allocated(zknots)) &
             .or.(.not.allocated(gzbcoef)).or.(.not.allocated(qzbcoef)) &
-            .or.(.not.allocated(czbcoef)).or.(.not.allocated(zbcoef))) &
+            .or.(.not.allocated(czbcoef)).or.(.not.allocated(wp1zbcoef)) &
+            .or.(.not.allocated(zbcoef))) &
             stop 'check_splines: bcoefs not found!'
     endif
 
@@ -198,7 +208,7 @@ contains
 
     if (check_splines()) then
        deallocate(xknots,gxbcoef,qxbcoef)
-       deallocate(zknots,xbcoef,zbcoef,gzbcoef,qzbcoef,czbcoef)
+       deallocate(zknots,xbcoef,zbcoef,gzbcoef,qzbcoef,czbcoef,wp1zbcoef)
     endif
 
   end subroutine free_splines
@@ -209,7 +219,7 @@ contains
   subroutine set_splines()
     implicit none
     character(len=*), parameter :: tablefile = 'HP_B_thg.sav'
-    real(dp), dimension(:), allocatable :: xdata, gdata, qdata, zdata, cdata
+    real(dp), dimension(:), allocatable :: xdata, gdata, qdata, zdata, cdata, wp1data
 
 !set it to true to use preprocessed data
     logical, parameter :: usePP = .true.
@@ -217,14 +227,14 @@ contains
     if (check_splines()) stop 'set_splines: splines already set!'
 
     if (usePP) then
-       call preprocessed_data(xdata, qdata, gdata, zdata, cdata)
+       call preprocessed_data(xdata, qdata, gdata, zdata, cdata, wp1data)
     else
-       call readump_data(tablefile, xdata, qdata, gdata, zdata, cdata)
+       call readump_data(tablefile, xdata, qdata, gdata, zdata, cdata, wp1data)
     endif
 
     allocate(xknots(ndata+order),zknots(ndata+order))
     allocate(gxbcoef(ndata),qxbcoef(ndata),xbcoef(ndata),zbcoef(ndata))
-    allocate(gzbcoef(ndata),qzbcoef(ndata),czbcoef(ndata))
+    allocate(gzbcoef(ndata),qzbcoef(ndata),czbcoef(ndata),wp1zbcoef(ndata))
 
     call dbsnak(ndata,xdata(ndata:1:-1),order,xknots)
     call dbsint(ndata,xdata(ndata:1:-1),gdata(ndata:1:-1),order,xknots,gxbcoef)
@@ -236,8 +246,9 @@ contains
     call dbsint(ndata,zdata(ndata:1:-1),gdata(ndata:1:-1),order,zknots,gzbcoef)
     call dbsint(ndata,zdata(ndata:1:-1),qdata(ndata:1:-1),order,zknots,qzbcoef)
     call dbsint(ndata,zdata(ndata:1:-1),cdata(ndata:1:-1),order,zknots,czbcoef)
+    call dbsint(ndata,zdata(ndata:1:-1),wp1data(ndata:1:-1),order,zknots,wp1zbcoef)
     
-    deallocate(xdata,gdata,qdata,zdata,cdata)
+    deallocate(xdata,gdata,qdata,zdata,cdata,wp1data)
 
   end subroutine set_splines
 
@@ -270,6 +281,17 @@ contains
   
 
 
+  elemental function eosp1_rdof_from_all(x,q,g)
+    implicit none
+    real(dp), intent(in) :: x, q, g
+    real(dp) :: eosp1_rdof_from_all
+    real(dp), parameter :: fourthird = 4._dp/3._dp
+!w+1
+    eosp1_rdof_from_all = fourthird * q/g
+
+  end function eosp1_rdof_from_all
+
+  
   
   recursive function energy_rdof_x(x) result(g)
     implicit none
@@ -380,8 +402,7 @@ contains
     end if
     
   end function entropy_rdof_z
-
-
+  
 
 
   recursive function correction_rdof_z(z) result(c)
@@ -399,5 +420,27 @@ contains
 
   end function correction_rdof_z
   
+
+  
+  recursive function eos_rdof_z(z) result(w)
+    implicit none
+    real(dp), intent(in) :: z
+    real(dp) :: w
+
+!w becomes crazy under this value, possible due to e+e-
+!annihilation. It is computed from s=(rho+P)/T, the chemical potential
+!is not included. Non-conservation of the number of particles breaks
+!this calculation
+    real(dp) :: zee = 4.7955d9
+    
+    if (z.lt.zee) then
+       w = eos_rdof_z(zee)
+    elseif (z.gt.zmax) then
+       w = eos_rdof_z(zmax)
+    else
+       w = dbsval(z, order, zknots, ndata, wp1zbcoef) - 1._dp
+    end if
+
+  end function eos_rdof_z
   
 end module rdof

@@ -9,7 +9,7 @@ program thermalmain
   
   real(dp) :: x,y
   real(dp) :: lnxmin, lnxmax
-  real(dp), dimension(:), allocatable :: xdata, qdata, gdata, adata, cdata
+  real(dp), dimension(:), allocatable :: xdata, qdata, gdata, adata, cdata, wp1data
 
   real(dp) :: zp1,z,a
   real(dp) :: lnzp1min, lnzp1max
@@ -23,15 +23,13 @@ program thermalmain
   integer :: npoints
   integer :: i
 
+#ifdef CREATEPP  
+  call readump_data('HP_B_thg.sav',xdata, qdata, gdata, adata, cdata, wp1data)
+  stop
+#endif
   
-!  call readump_data('HP_B_thg.sav',xdata, qdata, gdata, adata, cdata)
-!  stop
+  call preprocessed_data(xdata, qdata, gdata, adata, cdata, wp1data)
 
-  call preprocessed_data(xdata, qdata, gdata, adata, cdata)
-
-!  call set_splines()
-
-  
 
   call set_fiducial_flparams()
   
@@ -57,6 +55,7 @@ program thermalmain
   
   call delete_file('gandqstar_z.dat')
   call delete_file('hubble_z.dat')
+  call delete_file('eos_z.dat')
   call delete_file('rdofcorr.dat')
   call delete_file('times.dat')
   call delete_file('eta.dat')
@@ -82,6 +81,8 @@ program thermalmain
      qstar = entropy_rdof_z(z)
      x = x_rdof(z)
 
+
+     
      tHo = cosmic_time_normalized(z)
      timatHo = cosmic_instmattime_normalized(z)
      tpmatHo = cosmic_puremattime_normalized(z)
@@ -112,6 +113,7 @@ program thermalmain
      call livewrite('hubble_z.dat',z,hubble_normalized(z)/zp1/zp1)
 #ifdef THERMAL     
      call livewrite('rdofcorr.dat',z,correction_rdof(z))
+     call livewrite('eos_z.dat',z,eos_rdof_z(z))
 #endif     
      
   enddo
