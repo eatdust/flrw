@@ -130,7 +130,7 @@ module flapprox
 !mixture matter and radiation
   public conformal_radmattime_normalized
   public redshift_conformal_radmattime_normalized
-  
+  public conformal_radmattime_equality_normalized
 
 
   
@@ -716,7 +716,16 @@ contains
   end function conformal_radmattime_normalized
 
 
-
+!returns the mixture radiation+matter  calHo * conformal time at which rhomat=rhorad or
+!z=zeq. 
+  function conformal_radmattime_equality_normalized()
+    implicit none
+    real(cp) :: conformal_radmattime_equality_normalized
+    real(cp), parameter :: mixfactor = 2._cp*(sqrt(2._cp)-1._cp)
+    
+    conformal_radmattime_equality_normalized = mixfactor*sqrt(flParams%OmegaR)/flParams%OmegaM
+    
+  end function conformal_radmattime_equality_normalized
 
   
   recursive function redshift_conformal_radmattime_normalized(etaHo,Q,y) result(z)

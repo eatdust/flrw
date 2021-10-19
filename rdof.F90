@@ -35,7 +35,7 @@ module rdof
   real(dp), parameter :: MpInK = MpInGeV*GeV
 
   
-  logical, parameter :: display = .true.
+  logical, parameter :: display = .false.
 
 !define CREATEPP to generate binary preprocessed data in rdof.pp
 !from data file
