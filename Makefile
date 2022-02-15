@@ -5,7 +5,7 @@ ext=$(shell uname | cut -c1-3)
 
 ifeq ($(ext),Lin)
 FC=gfortran
-FFLAGS= -O -fopenmp -ffree-line-length-none -D$(ext) -DTHERMAL 
+FFLAGS= -O -fopenmp -ffree-line-length-none -D$(ext) -DTHERMAL
 #-DTHERMAL -DCREATEPP
 endif
 

@@ -7,7 +7,7 @@ program thermalmain
 
   implicit none
   
-  real(dp) :: x,y
+  real(dp) :: x,y, y1,y2
   real(dp) :: lnxmin, lnxmax
   real(dp), dimension(:), allocatable :: xdata, qdata, gdata, adata, cdata, wp1data
 
@@ -59,6 +59,7 @@ program thermalmain
   call delete_file('rdofcorr.dat')
   call delete_file('times.dat')
   call delete_file('eta.dat')
+  call delete_file('redshift_eta.dat')
   
   lnzp1min = 0.1_dp
   lnzp1max = 40._dp
@@ -100,11 +101,14 @@ program thermalmain
      etaHoIMat = conformal_instmattime_normalized(z)
      etaHoRadMat = conformal_radmattime_normalized(z)
 
-     y = redshift_conformal_radmattime_normalized(etaHoRadMat,Q=1._dp)
-
-!     print *,'redshifts= ',z,x,y
+     y1 = redshift_conformal_radmattime_normalized(etaHoRadMat,Q=1._dp)
+     y2 = redshift_conformal_normalized(etaHoEx)
+     
+     print *,'redshifts= ',z,x,y1,y2
      
      call livewrite('eta.dat',z,etaHoEx,etaHoRadMat,etaHoPMat,etaHoIMat)
+
+     call livewrite('redshift_eta.dat',z,(z-y1)/z,(z-y2)/z)
      
      call livewrite('times.dat',z,tHo,tpmatHo,timatHo,tradHo)
      

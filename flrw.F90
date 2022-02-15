@@ -26,7 +26,10 @@ module flrw
   public redshift_equality  
   public redshift_normalized
   public redshift_chioa_normalized
-     
+
+  public redshift_conformal
+  public redshift_conformal_normalized
+  
   public hubble_today_hz, hubble_today, hubble_normalized, hubble_today_Lpl
   public omegarad_today, omegamat_today, omegalambda_today
   
@@ -275,6 +278,8 @@ contains
     real(cp) :: conformal_time_normalized
     real(cp), intent(in) :: redshift
 
+    real(cp), parameter :: tol = tolfl
+    
     integer, parameter :: neq=1
 
     real(cp) :: scaleFactor, scaleStart
@@ -285,7 +290,7 @@ contains
     scaleStart = 0._cp
     eta = 0._cp
 
-    call easydverk(neq,deriv_conftime_normalized,scaleStart,eta,scaleFactor)
+    call easydverk(neq,deriv_conftime_normalized,scaleStart,eta,scaleFactor,tol)
 
     !this a0 x eta x Ho
     conformal_time_normalized = eta(neq)
@@ -365,17 +370,16 @@ contains
     real(cp), intent(in) :: cosmicTimeHo
 
     integer, parameter :: neq=1
+
 !should be in the high energy regime for thermal history 2d17
     real(cp), parameter :: zDeepRad = 2d17
-    real(cp), parameter :: aDeepRad = 1._cp/(1._cp + zDeepRad)
-
 !for z>zbig, we invert analytic formulae    
     real(cp), parameter :: zBig = 1d7
+
     real(cp) :: tsmallHo
-    
     real(cp) :: tnowHo,sqrtomR
     real(cp) :: scaleFactor,tHoDeepRad
-    real(cp), dimension(neq) :: a,lna
+    real(cp), dimension(neq) :: a
 
     logical, parameter :: useHighZApprox = .true.
 
@@ -454,6 +458,102 @@ contains
 
 
 
+
+  function redshift_conformal_normalized(etaHo)
+    use functools, only : easydverk
+    use flapprox, only : conformal_radmattime_normalized
+    use flapprox, only : redshift_conformal_radmattime_normalized
+    implicit none
+    real(cp) :: redshift_conformal_normalized
+    real(cp), intent(in) :: etaHo
+    integer, parameter :: neq=1
+    real(cp), dimension(neq) :: a
+
+!should be in the high energy regime for thermal history 2d17
+    real(cp), parameter :: zDeepRad = 2d17
+!for z>zbig, we invert analytic formulae    
+    real(cp), parameter :: zBig = 1d7
+
+    real(cp) :: etasmallHo, etaHoDeepRad
+    real(cp) :: etanowHo, scaleFactor, sqrtomR
+
+    real(cp), parameter :: tol = tolfl
+
+
+    logical, parameter :: useHighZApprox = .true.
+
+    
+    if (useHighZApprox) then
+
+       etaHoDeepRad = conformal_radmattime_normalized(zDeepRad)
+
+!rdof is constant in the SM for z>zdeeprad, we do not need to
+!integrate anything nor invert thermal history formulae
+       if (etaHo.lt.etaHoDeepRad) then
+#ifndef THERMAL    
+          sqrtomR = sqrt(flParams%OmegaR)
+#else
+          sqrtomR = sqrt(flParams%OmegaR * correction_rdof(zDeepRad))
+#endif
+
+          redshift_conformal_normalized = 1._cp &
+               /(0.25_cp*flParams%OmegaM * etaHo*etaHo + sqrtomR * etaHo) &
+               - 1._cp
+          
+          return
+          
+       endif
+       
+       etasmallHo = conformal_radmattime_normalized(zBig)
+
+       if (etaHo.lt.etasmallHo) then
+
+          redshift_conformal_normalized = redshift_conformal_radmattime_normalized(etaHo,Q=1._cp)
+
+          return
+          
+       endif
+       
+    endif
+
+    
+    
+!Exact integration in between, or all the time is useHighZApprox is false
+    etanowHo = conformal_time_normalized(0._cp)
+    a = 1._cp
+
+    call easydverk(neq,deriv_conformal_scalefactor_normalized,etanowHo,a,etaHo,tol)
+    scaleFactor = a(neq)
+
+    redshift_conformal_normalized = 1._cp/scaleFactor - 1._cp
+        
+  end function redshift_conformal_normalized
+
+  
+
+  subroutine deriv_conformal_scalefactor_normalized(neq,etaHo,a,aPrime)
+    implicit none
+    integer :: neq
+    real(cp) :: etaHo
+    real(cp), dimension(neq) :: a, aPrime
+
+    aPrime = hubble_normalized_scalefactor_square(a(neq))
+
+    
+  end subroutine deriv_conformal_scalefactor_normalized
+
+
+  function redshift_conformal(conformalTime)
+    implicit none
+    real(cp) :: redshift_conformal
+    real(cp), intent(in) :: conformalTime
+
+    redshift_conformal = redshift_conformal_normalized(conformalTime*flParams%hubbleToday)
+
+  end function redshift_conformal
+  
+
+  
 !a^2 H
   function hubble_scalefactor_square(scaleFactor)
     implicit none
