@@ -34,7 +34,7 @@ module flvars
   public tolfl, big
   
   public flParams, correction_rdof, entropy_correction_rdof
-
+  public equation_of_state_rdof
 contains
 
   
@@ -59,6 +59,17 @@ contains
     
   end function entropy_correction_rdof
 
+
+  function equation_of_state_rdof(z)
+    use rdof, only : dp, eos_rdof_z
+    implicit none
+    real(cp), intent(in) :: z
+    real(cp) :: equation_of_state_rdof
+
+    equation_of_state_rdof = 1._cp/3._cp
+    
+  end function equation_of_state_rdof
+  
 #else
 !for hiding possible type differences
 
@@ -71,8 +82,18 @@ contains
     correction_rdof = correction_rdof_z(real(z,dp))
     
   end function correction_rdof
-  
 
+
+  function equation_of_state_rdof(z)
+    use rdof, only : dp, eos_rdof_z
+    implicit none
+    real(cp), intent(in) :: z
+    real(cp) :: equation_of_state_rdof
+
+    equation_of_state_rdof = eos_rdof_z(z)
+    
+  end function equation_of_state_rdof
+    
   
   function entropy_correction_rdof(z)
     use rdof, only : dp, entropy_rdof_z

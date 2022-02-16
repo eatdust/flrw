@@ -3,7 +3,14 @@ module flrw
   use flvars, only : cp, cep, flbgparam
   use flvars, only : c, Mpc,My,LPl
   use flvars, only : tolfl, big
-  use flvars, only : flParams, correction_rdof, entropy_correction_rdof
+  use flvars, only : flParams
+  use flvars, only : correction_rdof, entropy_correction_rdof, equation_of_state_rdof
+
+#ifndef SUNDIALS
+  use functools, only : easydverk
+#else
+  use sundials, only : easycvode
+#endif  
   
     
   implicit none
@@ -32,6 +39,9 @@ module flrw
   
   public hubble_today_hz, hubble_today, hubble_normalized, hubble_today_Lpl
   public omegarad_today, omegamat_today, omegalambda_today
+
+  public conformal_deriv_second_a_over_a_normalized
+  public hubble_normalized_scalefactor_square
   
 #ifdef THERMAL
   public correction_rdof, entropy_correction_rdof
@@ -227,7 +237,6 @@ contains
 
   
   function comoving_distance_normalized(redshift)
-    use functools, only : easydverk    
     implicit none
     real(cp) :: comoving_distance_normalized
     real(cp), intent(in) :: redshift
@@ -249,9 +258,13 @@ contains
     scaleFactor = 1._cp/(1._cp + redshift)
     scaleStop = 1._cp
     chi = 0._cp
-    
-    call easydverk(neq,deriv_conftime_normalized,scaleFactor,chi,scaleStop,tol)
 
+#ifndef SUNDIALS    
+    call easydverk(neq,deriv_conftime_normalized,scaleFactor,chi,scaleStop,tol)
+#else
+    chi = easycvode(neq,deriv_conftime_normalized,scaleFactor,chi,scaleStop,tol)
+#endif
+    
     comoving_distance_normalized = chi(neq)
 
   end function comoving_distance_normalized
@@ -273,7 +286,6 @@ contains
 
 
   function conformal_time_normalized(redshift)
-    use functools, only : easydverk
     implicit none
     real(cp) :: conformal_time_normalized
     real(cp), intent(in) :: redshift
@@ -290,15 +302,18 @@ contains
     scaleStart = 0._cp
     eta = 0._cp
 
+#ifndef SUNDIALS    
     call easydverk(neq,deriv_conftime_normalized,scaleStart,eta,scaleFactor,tol)
-
+#else
+    eta = easycvode(neq,deriv_conftime_normalized,scaleStart,eta,scaleFactor,tol)
+#endif    
     !this a0 x eta x Ho
     conformal_time_normalized = eta(neq)
 
   end function conformal_time_normalized
   
 
-
+#ifndef SUNDIALS
 
   subroutine deriv_conftime_normalized(neq,aOveraZero,eta,etaPrime)
     implicit none          
@@ -307,9 +322,23 @@ contains
     real(cp), dimension(neq) :: eta, etaPrime
 
     etaPrime = 1._cp/hubble_normalized_scalefactor_square(aOveraZero)
-
+    
   end subroutine deriv_conftime_normalized
 
+#else
+  
+  function deriv_conftime_normalized(neq,aOveraZero,eta) result(etaPrime)
+    implicit none
+    integer, intent(in) :: neq
+    real(cp), intent(in) :: aOveraZero
+    real(cp), dimension(neq), intent(in) :: eta
+    real(cp), dimension(neq) :: etaPrime
+    
+    etaPrime = 1._cp/hubble_normalized_scalefactor_square(aOveraZero)
+    
+  end function deriv_conftime_normalized
+
+#endif
   
 
   function cosmic_time(redshift)
@@ -324,7 +353,6 @@ contains
 
   
   function cosmic_time_normalized(redshift)
-    use functools, only : easydverk
     implicit none
     real(cp) :: cosmic_time_normalized
     real(cp), intent(in) :: redshift
@@ -338,31 +366,46 @@ contains
     scaleStart = 0._cp
     t = 0._cp
 
+#ifndef SUNDIALS    
     call easydverk(neq,deriv_cosmic_time_normalized,scaleStart,t,scaleFactor)
+#else
+    t = easycvode(neq,deriv_cosmic_time_normalized,scaleStart,t,scaleFactor)
+#endif
     
     cosmic_time_normalized = t(neq)
 
   end function cosmic_time_normalized
 
   
-
+#ifndef SUNDIALS
+  
   subroutine deriv_cosmic_time_normalized(neq,aOveraZero,t,tPrime)
     implicit none          
     integer :: neq
     real(cp) :: aOveraZero
     real(cp), dimension(neq) :: t,tPrime
 
-!    real(cp) :: scaleFactor
-!    scaleFactor = aOveraZero
-
     tPrime = aOveraZero/hubble_normalized_scalefactor_square(aOveraZero)
 
   end subroutine deriv_cosmic_time_normalized
 
+#else
+
+  function deriv_cosmic_time_normalized(neq,aOveraZero,t) result(tPrime)
+    implicit none
+    integer, intent(in) :: neq
+    real(cp), intent(in) :: aOveraZero
+    real(cp), dimension(neq), intent(in) :: t
+    real(cp), dimension(neq) :: tPrime
+    
+    tPrime = aOveraZero/hubble_normalized_scalefactor_square(aOveraZero)
+    
+  end function deriv_cosmic_time_normalized
+
+#endif  
 
   
   function redshift_normalized(cosmicTimeHo)
-    use functools, only : easydverk
     use flapprox, only : cosmic_radtime_normalized
     use flapprox, only : redshift_radtime_normalized
     implicit none
@@ -424,7 +467,12 @@ contains
     tnowHo = cosmic_time_normalized(0._cp)
     a = 1._cp
 
+#ifndef SUNDIALS    
     call easydverk(neq,deriv_scalefactor_normalized,tnowHo,a,cosmicTimeHo)
+#else
+    a = easycvode(neq,deriv_scalefactor_normalized,tnowHo,a,cosmicTimeHo)
+#endif
+    
     scaleFactor = a(neq)
 
     
@@ -433,7 +481,7 @@ contains
   end function redshift_normalized
 
 
-  
+#ifndef SUNDIALS  
    subroutine deriv_scalefactor_normalized(neq,tHo,a,aPrime)
     implicit none
     integer :: neq
@@ -444,7 +492,18 @@ contains
     
   end subroutine deriv_scalefactor_normalized
 
-  
+#else
+ function deriv_scalefactor_normalized(neq,tHo,a) result(aPrime)
+    implicit none
+    integer, intent(in) :: neq
+    real(cp), intent(in) :: tHo
+    real(cp), dimension(neq), intent(in) :: a
+    real(cp), dimension(neq) :: aPrime
+    
+    aPrime = hubble_normalized_scalefactor_square(a(neq))/a(neq)
+    
+  end function deriv_scalefactor_normalized
+#endif  
 
   
   function redshift(cosmicTime)
@@ -460,7 +519,6 @@ contains
 
 
   function redshift_conformal_normalized(etaHo)
-    use functools, only : easydverk
     use flapprox, only : conformal_radmattime_normalized
     use flapprox, only : redshift_conformal_radmattime_normalized
     implicit none
@@ -522,7 +580,11 @@ contains
     etanowHo = conformal_time_normalized(0._cp)
     a = 1._cp
 
+#ifndef SUNDIALS    
     call easydverk(neq,deriv_conformal_scalefactor_normalized,etanowHo,a,etaHo,tol)
+#else
+    a = easycvode(neq,deriv_conformal_scalefactor_normalized,etanowHo,a,etaHo,tol)
+#endif    
     scaleFactor = a(neq)
 
     redshift_conformal_normalized = 1._cp/scaleFactor - 1._cp
@@ -530,7 +592,7 @@ contains
   end function redshift_conformal_normalized
 
   
-
+#ifndef SUNDIALS
   subroutine deriv_conformal_scalefactor_normalized(neq,etaHo,a,aPrime)
     implicit none
     integer :: neq
@@ -538,11 +600,25 @@ contains
     real(cp), dimension(neq) :: a, aPrime
 
     aPrime = hubble_normalized_scalefactor_square(a(neq))
-
     
   end subroutine deriv_conformal_scalefactor_normalized
 
+#else
 
+   function deriv_conformal_scalefactor_normalized(neq,etaHo,a) result(aPrime)
+    implicit none
+    integer, intent(in) :: neq
+    real(cp), intent(in) :: etaHo
+    real(cp), dimension(neq), intent(in) :: a
+    real(cp), dimension(neq) :: aPrime
+    
+    aPrime = hubble_normalized_scalefactor_square(a(neq))
+    
+  end function deriv_conformal_scalefactor_normalized
+
+#endif
+
+  
   function redshift_conformal(conformalTime)
     implicit none
     real(cp) :: redshift_conformal
@@ -582,7 +658,18 @@ contains
     
   end function hubble_normalized_scalefactor_square
 
+
   
+  function conformal_deriv_second_a_over_a_normalized(scaleFactor)
+    implicit none
+    real(cp) :: conformal_deriv_second_a_over_a_normalized
+    real(cp), intent(in) :: scaleFactor
+
+    conformal_deriv_second_a_over_a_normalized &
+         = nothermal_hubble_normalized_scalefactor_square(scaleFactor)
+    
+  end function conformal_deriv_second_a_over_a_normalized
+    
 #else  
     
   function hubble_normalized_scalefactor_square(scaleFactor)
@@ -591,6 +678,7 @@ contains
     real(cp), intent(in) :: scaleFactor
 
     real(cp) :: z
+
     z = 1._cp/scaleFactor - 1._cp
     
     hubble_normalized_scalefactor_square &
@@ -603,6 +691,24 @@ contains
 
 
   
+!this is (a''/a) * 1/(ao^2 Ho^2) = (calH^2 + calH')/(calHo^2)
+  function conformal_deriv_second_a_over_a_normalized(scaleFactor)
+    implicit none
+    real(cp) :: conformal_deriv_second_a_over_a_normalized
+    real(cp), intent(in) :: scaleFactor
+
+    real(cp) :: z
+
+    z = 1._cp/scaleFactor - 1._cp
+    
+    conformal_deriv_second_a_over_a_normalized = flParams%OmegaK &
+         + 0.5_cp * flParams%OmegaM/scaleFactor &
+         + 2._cp*flParams%OmegaL*scaleFactor*scaleFactor &
+         + 0.5_cp*flParams%OmegaR*(1._cp - 3._cp*equation_of_state_rdof(z)) &
+         /scaleFactor**2
+
+  end function conformal_deriv_second_a_over_a_normalized
+
   
 #endif
   
@@ -635,6 +741,25 @@ contains
     hubble_normalized = a2HoverHo/scaleFactor/ScaleFactor
     
   end function hubble_normalized
+
+
+!this is (a''/a) * 1/(ao^2 Ho^2) = (calH^2 + calH')/(calHo^2) with wrad = 1/3
+  function nothermal_conformal_deriv_second_a_over_a_normalized(z)
+    implicit none
+    real(cp) :: nothermal_conformal_deriv_second_a_over_a_normalized
+    real(cp), intent(in) :: z
+
+    real(cp) :: scaleFactor
+
+    scaleFactor = 1._cp/(1._cp + z)
+
+    
+    nothermal_conformal_deriv_second_a_over_a_normalized = flParams%OmegaK &
+         + 0.5_cp * flParams%OmegaM/scaleFactor &
+         + 2._cp*flParams%OmegaL*scaleFactor*scaleFactor        
+
+  end function nothermal_conformal_deriv_second_a_over_a_normalized
+  
   
   
   !returns z such that Ho Chi(z) (1+z) = Hochioa
