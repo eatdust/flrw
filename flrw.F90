@@ -524,6 +524,7 @@ contains
     implicit none
     real(cp) :: redshift_conformal_normalized
     real(cp), intent(in) :: etaHo
+    
     integer, parameter :: neq=1
     real(cp), dimension(neq) :: a
 

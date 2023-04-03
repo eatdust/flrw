@@ -130,6 +130,7 @@ module flapprox
 !mixture matter and radiation
   public conformal_radmattime_normalized
   public redshift_conformal_radmattime_normalized
+  public thermal_redshift_conformal_radmattime_normalized, nothermal_redshift_conformal_radmattime_normalized
   public conformal_radmattime_equality_normalized
 
 
@@ -763,18 +764,25 @@ contains
   end function redshift_conformal_radmattime_normalized
 
 
+!for being target of procedure pointers without the optional arguments
+  function nothermal_redshift_conformal_radmattime_normalized(etaHo) result(z)
+    implicit none
+    real(cp) :: z
+    real(cp), intent(in) :: etaHo
 
+    z = redshift_conformal_radmattime_normalized(etaHo)
+    
+  end function nothermal_redshift_conformal_radmattime_normalized
 
+  
+  function thermal_redshift_conformal_radmattime_normalized(etaHo) result(z)
+    implicit none
+    real(cp) :: z
+    real(cp), intent(in) :: etaHo
 
-
-
-
-
-
-
-
-
-
- 
+    z = redshift_conformal_radmattime_normalized(etaHo,Q=1.0_cp)
+    
+  end function thermal_redshift_conformal_radmattime_normalized
+  
   
 end module flapprox
