@@ -1,1 +1,1 @@
-/home/chris/numerics/common/precision.f90
+../futilities/precision.f90

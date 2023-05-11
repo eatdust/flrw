@@ -7,7 +7,7 @@ module flrw
   use flvars, only : correction_rdof, entropy_correction_rdof, equation_of_state_rdof
 
 #ifndef SUNDIALS
-  use functools, only : easydverk
+  use funcutils, only : easydverk
 #else
   use sundials, only : easycvode
 #endif  
@@ -765,7 +765,7 @@ contains
   
   !returns z such that Ho Chi(z) (1+z) = Hochioa
   function redshift_chioa_normalized(Hochioa)
-    use functools, only : brent
+    use funcutils, only : brent
     implicit none
     real(cp) :: redshift_chioa_normalized
     real(cp), intent(in) :: Hochioa

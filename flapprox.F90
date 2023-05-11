@@ -346,7 +346,7 @@ contains
   
 !for test, inversion of redshift from time using brent
   function brent_redshift_radtime_normalized(cosmicTimeHo)
-    use functools, only : brent
+    use funcutils, only : brent
     implicit none
     real(cp), intent(in) :: cosmicTimeHo
     real(cp) :: brent_redshift_radtime_normalized

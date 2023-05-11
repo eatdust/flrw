@@ -16,7 +16,7 @@ LDFLAGS += -lsundials_cvode -lsundials_fcvode_mod
 OBJSUN+=sundials.o
 endif
 
-OBJTH=precision.o bspline.o rdof.o iotools.o functools.o $(OBJSUN) flvars.o flapprox.o flrw.o
+OBJTH=precision.o bspline.o rdof.o iotools.o funcutils.o $(OBJSUN) flvars.o flapprox.o flrw.o
 
 thermalmain.$(ext) : $(OBJTH) thermalmain.o
 	$(FC) $(FFLAGS) $(OBJTH) thermalmain.o -o $@ $(LDFLAGS)
