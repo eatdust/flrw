@@ -1,5 +1,4 @@
-# FLRW: a module to compute various quantities in Friedmann-Lemaître
-  spacetimes with realistic thermal history.
+# FLRW: a module to compute various quantities in Friedmann-Lemaître spacetimes
 
 ---
 
